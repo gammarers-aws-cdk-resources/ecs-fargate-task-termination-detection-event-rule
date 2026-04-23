@@ -1,0 +1,78 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`EcsFargateTaskTerminationDetectionNotificationEventRule Testing should match the snapshot 1`] = `
+{
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "EcsFargateTaskTerminationDetectionEventRuleDB58C924": {
+      "Properties": {
+        "Description": "example event rule.",
+        "EventPattern": {
+          "detail": {
+            "clusterArn": "arn:aws:ecs:us-east-1:123456789012:cluster/example-app-cluster",
+            "containers": {
+              "exitCode": [
+                {
+                  "anything-but": 0,
+                },
+              ],
+            },
+            "lastStatus": [
+              "STOPPED",
+            ],
+            "stoppedReason": [
+              {
+                "anything-but": {
+                  "prefix": "Scaling activity initiated by",
+                },
+              },
+            ],
+          },
+          "detail-type": [
+            "ECS Task State Change",
+          ],
+          "source": [
+            "aws.ecs",
+          ],
+        },
+        "Name": "example-event-rule",
+        "State": "ENABLED",
+      },
+      "Type": "AWS::Events::Rule",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;
