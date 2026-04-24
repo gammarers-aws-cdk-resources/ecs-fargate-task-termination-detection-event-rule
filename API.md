@@ -6,7 +6,8 @@
 
 EventBridge rule that detects ECS/Fargate task terminations caused by non-zero container exit codes, while excluding expected scaling events.
 
-This rule sets its own `eventPattern`. Providing `props.eventPattern` is not supported.
+This rule defines its own `eventPattern` and does not accept `props.eventPattern`.
+The pattern is scoped to the given `clusterArn`.
 
 #### Initializers <a name="Initializers" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRule.Initializer"></a>
 
