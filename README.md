@@ -49,7 +49,8 @@ const rule = new EcsFargateTaskTerminationDetectionEventRule(stack, 'EcsFargateT
 ## Options
 
 - `clusterArn` (required): ARN of the ECS cluster to monitor
-- `eventPattern`: Not supported. This construct defines its own `eventPattern` and will throw if you provide one.
+- Any other `RuleProps` options (e.g., `description`, `enabled`, `ruleName`, `targets`) can be provided as usual.
+- `eventPattern`: Not supported. This construct always defines its own `eventPattern` and will throw if you provide one.
 
 ## Requirements
 
