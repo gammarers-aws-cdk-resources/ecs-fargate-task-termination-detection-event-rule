@@ -1,6 +1,6 @@
 {
   "name": "ecs-fargate-task-termination-detection-event-rule",
-  "description": "An AWS CDK construct that creates an Amazon EventBridge rule to detect ECS/Fargate task terminations with non-zero container exit codes, while excluding expected scaling events.",
+  "description": "An AWS CDK construct that creates an Amazon EventBridge rule to detect ECS/Fargate task terminations caused by unexpected failures (non-zero exit codes and startup/pull failures), while excluding expected scaling events.",
   "repository": {
     "type": "git",
     "url": "https://github.com/gammarers-aws-cdk-resources/ecs-fargate-task-termination-detection-event-rule.git"

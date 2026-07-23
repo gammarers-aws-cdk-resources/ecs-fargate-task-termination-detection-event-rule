@@ -8,7 +8,7 @@ const project = new awscdk.AwsCdkConstructLibrary({
   jsiiVersion: '5.9.x',
   name: 'ecs-fargate-task-termination-detection-event-rule',
   packageManager: javascript.NodePackageManager.YARN_CLASSIC,
-  description: 'An AWS CDK construct that creates an Amazon EventBridge rule to detect ECS/Fargate task terminations with non-zero container exit codes, while excluding expected scaling events.',
+  description: 'An AWS CDK construct that creates an Amazon EventBridge rule to detect ECS/Fargate task terminations caused by unexpected failures (non-zero exit codes and startup/pull failures), while excluding expected scaling events.',
   keywords: ['aws', 'cdk', 'aws-cdk', 'event', 'rule', 'ecs', 'fargate'],
   projenrcTs: true,
   releaseToNpm: true,
