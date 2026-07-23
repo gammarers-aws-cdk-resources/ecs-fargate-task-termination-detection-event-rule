@@ -7,13 +7,18 @@
 
 [![View on Construct Hub](https://constructs.dev/badge?package=ecs-fargate-task-termination-detection-event-rule)](https://constructs.dev/packages/ecs-fargate-task-termination-detection-event-rule)
 
-An AWS CDK construct that creates an Amazon EventBridge rule to detect ECS/Fargate task terminations with non-zero container exit codes, while excluding expected scaling events.
+An AWS CDK construct that creates an Amazon EventBridge rule to detect ECS/Fargate task terminations caused by unexpected failures (non-zero exit codes and startup/pull failures), while excluding expected scaling events.
 
 ## Features
 
 - Detects ECS task state changes where `lastStatus` is `STOPPED`
-- Filters for non-zero container exit codes
-- Excludes common, expected scaling stop reasons
+- By default, matches both non-zero container exit codes and startup/pull failures via EventBridge `$or`
+  - Non-zero `containers.exitCode` (excluding expected scaling stop reasons)
+  - `stopCode` = `TaskFailedToStart`
+  - `stoppedReason` prefixes such as `CannotPullContainerError` and `ResourceInitializationError`
+- Supports `detectionMode` to narrow matching to exit-code-only or startup-failure-only
+- Scopes matching to a specific ECS cluster via `clusterArn`
+- Owns its own `eventPattern` (`props.eventPattern` is not allowed)
 
 ## Installation
 
@@ -31,33 +36,45 @@ npm install ecs-fargate-task-termination-detection-event-rule
 yarn add ecs-fargate-task-termination-detection-event-rule
 ```
 
-
 ## Usage
 
 ```typescript
-import { EcsFargateTaskTerminationDetectionEventRule } from 'ecs-fargate-task-termination-detection-event-rule';
+import {
+  EcsFargateTaskTerminationDetectionEventRule,
+  EcsFargateTaskTerminationDetectionMode,
+} from 'ecs-fargate-task-termination-detection-event-rule';
 
 const clusterArn = 'arn:aws:ecs:us-east-1:123456789012:cluster/example-app-cluster';
 
+// Default: ALL_FAILURES (non-zero exitCode or startup/pull failures)
 const rule = new EcsFargateTaskTerminationDetectionEventRule(stack, 'EcsFargateTaskTerminationDetectionEventRule', {
-  description: 'example event rule.',
+  description: 'Detect unexpected ECS/Fargate task terminations.',
   clusterArn,
 });
 
+// Optional: narrow matching to non-zero exit codes only
+const exitCodeOnlyRule = new EcsFargateTaskTerminationDetectionEventRule(stack, 'ExitCodeOnlyRule', {
+  clusterArn,
+  detectionMode: EcsFargateTaskTerminationDetectionMode.NON_ZERO_EXIT_CODE,
+});
 ```
 
 ## Options
 
 - `clusterArn` (required): ARN of the ECS cluster to monitor
-- Any other `RuleProps` options (e.g., `description`, `enabled`, `ruleName`, `targets`) can be provided as usual.
-- `eventPattern`: Not supported. This construct always defines its own `eventPattern` and will throw if you provide one.
+- `detectionMode` (optional): Failure matching strategy. Defaults to `EcsFargateTaskTerminationDetectionMode.ALL_FAILURES`
+  - `ALL_FAILURES`: non-zero `exitCode` **or** startup/pull failures (`stopCode` = `TaskFailedToStart` / known `stoppedReason` prefixes)
+  - `NON_ZERO_EXIT_CODE`: only non-zero container exit codes
+  - `TASK_FAILED_TO_START`: only startup/pull failures
+- Any other `RuleProps` options (for example `description`, `enabled`, `ruleName`, `targets`) can be provided as usual
+- `eventPattern`: Not supported. This construct always defines its own `eventPattern` and will throw if you provide one
 
 ## Requirements
 
 - Node.js `>= 20`
-- AWS CDK `aws-cdk-lib` v2
-- `constructs` v10
+- AWS CDK `aws-cdk-lib` `^2.232.0`
+- `constructs` `^10.5.1`
 
 ## License
 
-This project is licensed under the (Apache-2.0) License.
+This project is licensed under the Apache-2.0 License.
