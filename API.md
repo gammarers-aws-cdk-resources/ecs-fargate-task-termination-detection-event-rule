@@ -4,7 +4,12 @@
 
 ### EcsFargateTaskTerminationDetectionEventRule <a name="EcsFargateTaskTerminationDetectionEventRule" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRule"></a>
 
-EventBridge rule that detects ECS/Fargate task terminations caused by non-zero container exit codes, while excluding expected scaling events.
+EventBridge rule that detects ECS/Fargate task terminations caused by unexpected failures, while excluding expected scaling events.
+
+By default this matches both non-zero container exit codes and startup/pull
+failures where `exitCode` is absent (for example `CannotPullContainerError`
+/ `TaskFailedToStart`). Use {@link EcsFargateTaskTerminationDetectionMode}
+to narrow the match if needed.
 
 This rule defines its own `eventPattern` and does not accept `props.eventPattern`.
 The pattern is scoped to the given `clusterArn`.
@@ -19,9 +24,9 @@ new EcsFargateTaskTerminationDetectionEventRule(scope: Construct, id: string, pr
 
 | **Name** | **Type** | **Description** |
 | --- | --- | --- |
-| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRule.Initializer.parameter.scope">scope</a></code> | <code>constructs.Construct</code> | *No description.* |
-| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRule.Initializer.parameter.id">id</a></code> | <code>string</code> | *No description.* |
-| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRule.Initializer.parameter.props">props</a></code> | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps">EcsFargateTaskTerminationDetectionEventRuleProps</a></code> | *No description.* |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRule.Initializer.parameter.scope">scope</a></code> | <code>constructs.Construct</code> | - Parent construct. |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRule.Initializer.parameter.id">id</a></code> | <code>string</code> | - Construct identifier. |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRule.Initializer.parameter.props">props</a></code> | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps">EcsFargateTaskTerminationDetectionEventRuleProps</a></code> | - Rule properties including required `clusterArn`. |
 
 ---
 
@@ -29,17 +34,23 @@ new EcsFargateTaskTerminationDetectionEventRule(scope: Construct, id: string, pr
 
 - *Type:* constructs.Construct
 
+Parent construct.
+
 ---
 
 ##### `id`<sup>Required</sup> <a name="id" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRule.Initializer.parameter.id"></a>
 
 - *Type:* string
 
+Construct identifier.
+
 ---
 
 ##### `props`<sup>Required</sup> <a name="props" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRule.Initializer.parameter.props"></a>
 
 - *Type:* <a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps">EcsFargateTaskTerminationDetectionEventRuleProps</a>
+
+Rule properties including required `clusterArn`.
 
 ---
 
@@ -382,6 +393,9 @@ Uniquely identifies this class.
 
 Properties for {@link EcsFargateTaskTerminationDetectionEventRule}.
 
+Extends EventBridge {@link RuleProps}, except `eventPattern` which must not
+be set (this construct always owns the pattern).
+
 #### Initializer <a name="Initializer" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.Initializer"></a>
 
 ```typescript
@@ -404,6 +418,7 @@ const ecsFargateTaskTerminationDetectionEventRuleProps: EcsFargateTaskTerminatio
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.schedule">schedule</a></code> | <code>aws-cdk-lib.aws_events.Schedule</code> | The schedule or rate (frequency) that determines when EventBridge runs the rule. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.targets">targets</a></code> | <code>aws-cdk-lib.aws_events.IRuleTarget[]</code> | Targets to invoke when this rule matches an event. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.clusterArn">clusterArn</a></code> | <code>string</code> | ARN of the ECS cluster to monitor. |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.detectionMode">detectionMode</a></code> | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode">EcsFargateTaskTerminationDetectionMode</a></code> | How task failures are matched in the EventBridge event pattern. |
 
 ---
 
@@ -554,10 +569,68 @@ public readonly clusterArn: string;
 
 ARN of the ECS cluster to monitor.
 
-This is used to scope the EventBridge rule to task state changes emitted
-by the specified cluster.
+Used to scope the EventBridge rule to task state change events from the
+specified cluster.
+
+---
+
+##### `detectionMode`<sup>Optional</sup> <a name="detectionMode" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.detectionMode"></a>
+
+```typescript
+public readonly detectionMode: EcsFargateTaskTerminationDetectionMode;
+```
+
+- *Type:* <a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode">EcsFargateTaskTerminationDetectionMode</a>
+- *Default:* EcsFargateTaskTerminationDetectionMode.ALL_FAILURES
+
+How task failures are matched in the EventBridge event pattern.
 
 ---
 
 
+
+## Enums <a name="Enums" id="Enums"></a>
+
+### EcsFargateTaskTerminationDetectionMode <a name="EcsFargateTaskTerminationDetectionMode" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode"></a>
+
+How {@link EcsFargateTaskTerminationDetectionEventRule} matches ECS/Fargate task failure events in its EventBridge pattern.
+
+#### Members <a name="Members" id="Members"></a>
+
+| **Name** | **Description** |
+| --- | --- |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode.NON_ZERO_EXIT_CODE">NON_ZERO_EXIT_CODE</a></code> | Detect only container exits with a non-zero `exitCode`. |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode.TASK_FAILED_TO_START">TASK_FAILED_TO_START</a></code> | Detect only tasks that failed to start (for example image pull failures). |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode.ALL_FAILURES">ALL_FAILURES</a></code> | Detect both non-zero exit codes and startup/pull failures (`TaskFailedToStart` / known `stoppedReason` prefixes). |
+
+---
+
+##### `NON_ZERO_EXIT_CODE` <a name="NON_ZERO_EXIT_CODE" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode.NON_ZERO_EXIT_CODE"></a>
+
+Detect only container exits with a non-zero `exitCode`.
+
+Does not match startup/pull failures (for example `CannotPullContainerError`)
+where `containers.exitCode` is absent.
+
+---
+
+
+##### `TASK_FAILED_TO_START` <a name="TASK_FAILED_TO_START" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode.TASK_FAILED_TO_START"></a>
+
+Detect only tasks that failed to start (for example image pull failures).
+
+Matched via `stopCode` = `TaskFailedToStart` or known startup-failure
+`stoppedReason` prefixes (`CannotPullContainerError`,
+`ResourceInitializationError`).
+
+---
+
+
+##### `ALL_FAILURES` <a name="ALL_FAILURES" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode.ALL_FAILURES"></a>
+
+Detect both non-zero exit codes and startup/pull failures (`TaskFailedToStart` / known `stoppedReason` prefixes).
+
+This is the default {@link EcsFargateTaskTerminationDetectionEventRuleProps.detectionMode}.
+
+---
 
