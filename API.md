@@ -4,12 +4,17 @@
 
 ### EcsFargateTaskTerminationDetectionEventRule <a name="EcsFargateTaskTerminationDetectionEventRule" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRule"></a>
 
-EventBridge rule that detects ECS/Fargate task terminations caused by unexpected failures, while excluding expected scaling events.
+EventBridge rule that detects ECS/Fargate task terminations caused by unexpected failures, while excluding expected operational stops (scale-in, rolling deployment replacement, user-initiated stops, and Fargate Spot interruptions).
 
 By default this matches both non-zero container exit codes and startup/pull
 failures where `exitCode` is absent (for example `CannotPullContainerError`
 / `TaskFailedToStart`). Use {@link EcsFargateTaskTerminationDetectionMode}
 to narrow the match if needed.
+
+Excluded `stoppedReason` prefixes default to
+{@link DefaultExcludedStoppedReasonPrefixes.ALL} and can be replaced or
+extended via
+{@link EcsFargateTaskTerminationDetectionEventRuleProps.excludedStoppedReasonPrefixes}.
 
 This rule defines its own `eventPattern` and does not accept `props.eventPattern`.
 The pattern is scoped to the given `clusterArn`.
@@ -419,6 +424,7 @@ const ecsFargateTaskTerminationDetectionEventRuleProps: EcsFargateTaskTerminatio
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.targets">targets</a></code> | <code>aws-cdk-lib.aws_events.IRuleTarget[]</code> | Targets to invoke when this rule matches an event. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.clusterArn">clusterArn</a></code> | <code>string</code> | ARN of the ECS cluster to monitor. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.detectionMode">detectionMode</a></code> | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode">EcsFargateTaskTerminationDetectionMode</a></code> | How task failures are matched in the EventBridge event pattern. |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.excludedStoppedReasonPrefixes">excludedStoppedReasonPrefixes</a></code> | <code>string[]</code> | `stoppedReason` prefixes excluded from non-zero exit-code matching via EventBridge `anything-but` prefix matching. |
 
 ---
 
@@ -587,6 +593,115 @@ How task failures are matched in the EventBridge event pattern.
 
 ---
 
+##### `excludedStoppedReasonPrefixes`<sup>Optional</sup> <a name="excludedStoppedReasonPrefixes" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.excludedStoppedReasonPrefixes"></a>
+
+```typescript
+public readonly excludedStoppedReasonPrefixes: string[];
+```
+
+- *Type:* string[]
+- *Default:* DefaultExcludedStoppedReasonPrefixes.ALL
+
+`stoppedReason` prefixes excluded from non-zero exit-code matching via EventBridge `anything-but` prefix matching.
+
+Applies only to the non-zero `exitCode` branch (`NON_ZERO_EXIT_CODE` and
+the corresponding `$or` branch of `ALL_FAILURES`). Startup-failure
+matching is unchanged.
+
+Pass a new array to replace the default set. To extend defaults, spread
+{@link DefaultExcludedStoppedReasonPrefixes.ALL} and append prefixes.
+Pass an empty array to disable exclusion.
+
+---
+
+## Classes <a name="Classes" id="Classes"></a>
+
+### DefaultExcludedStoppedReasonPrefixes <a name="DefaultExcludedStoppedReasonPrefixes" id="ecs-fargate-task-termination-detection-event-rule.DefaultExcludedStoppedReasonPrefixes"></a>
+
+Default `stoppedReason` prefixes treated as expected operational stops (not unexpected failures) and excluded from non-zero exit-code matching.
+
+Override via {@link EcsFargateTaskTerminationDetectionEventRuleProps.excludedStoppedReasonPrefixes}.
+To extend this set, spread {@link DefaultExcludedStoppedReasonPrefixes.ALL}
+and append extra prefixes.
+
+#### Initializers <a name="Initializers" id="ecs-fargate-task-termination-detection-event-rule.DefaultExcludedStoppedReasonPrefixes.Initializer"></a>
+
+```typescript
+import { DefaultExcludedStoppedReasonPrefixes } from 'ecs-fargate-task-termination-detection-event-rule'
+
+new DefaultExcludedStoppedReasonPrefixes()
+```
+
+| **Name** | **Type** | **Description** |
+| --- | --- | --- |
+
+---
+
+
+
+
+#### Constants <a name="Constants" id="Constants"></a>
+
+| **Name** | **Type** | **Description** |
+| --- | --- | --- |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.DefaultExcludedStoppedReasonPrefixes.property.ALL">ALL</a></code> | <code>string[]</code> | All default prefixes, in a stable order. |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.DefaultExcludedStoppedReasonPrefixes.property.SCALING_ACTIVITY_INITIATED_BY">SCALING_ACTIVITY_INITIATED_BY</a></code> | <code>string</code> | Service scale-in and rolling deployment replacement (`Scaling activity initiated by (deployment ...)`). |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.DefaultExcludedStoppedReasonPrefixes.property.SPOT_TASK_INTERRUPTED">SPOT_TASK_INTERRUPTED</a></code> | <code>string</code> | Fargate Spot reclaim (`stopCode` = `SpotInterruption`). |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.DefaultExcludedStoppedReasonPrefixes.property.TASK_STOPPED_BY_USER">TASK_STOPPED_BY_USER</a></code> | <code>string</code> | Console/API stop (`stopCode` = `UserInitiated`). |
+
+---
+
+##### `ALL`<sup>Required</sup> <a name="ALL" id="ecs-fargate-task-termination-detection-event-rule.DefaultExcludedStoppedReasonPrefixes.property.ALL"></a>
+
+```typescript
+public readonly ALL: string[];
+```
+
+- *Type:* string[]
+
+All default prefixes, in a stable order.
+
+Contains {@link DefaultExcludedStoppedReasonPrefixes.SCALING_ACTIVITY_INITIATED_BY},
+{@link DefaultExcludedStoppedReasonPrefixes.TASK_STOPPED_BY_USER}, and
+{@link DefaultExcludedStoppedReasonPrefixes.SPOT_TASK_INTERRUPTED}.
+
+---
+
+##### `SCALING_ACTIVITY_INITIATED_BY`<sup>Required</sup> <a name="SCALING_ACTIVITY_INITIATED_BY" id="ecs-fargate-task-termination-detection-event-rule.DefaultExcludedStoppedReasonPrefixes.property.SCALING_ACTIVITY_INITIATED_BY"></a>
+
+```typescript
+public readonly SCALING_ACTIVITY_INITIATED_BY: string;
+```
+
+- *Type:* string
+
+Service scale-in and rolling deployment replacement (`Scaling activity initiated by (deployment ...)`).
+
+---
+
+##### `SPOT_TASK_INTERRUPTED`<sup>Required</sup> <a name="SPOT_TASK_INTERRUPTED" id="ecs-fargate-task-termination-detection-event-rule.DefaultExcludedStoppedReasonPrefixes.property.SPOT_TASK_INTERRUPTED"></a>
+
+```typescript
+public readonly SPOT_TASK_INTERRUPTED: string;
+```
+
+- *Type:* string
+
+Fargate Spot reclaim (`stopCode` = `SpotInterruption`).
+
+---
+
+##### `TASK_STOPPED_BY_USER`<sup>Required</sup> <a name="TASK_STOPPED_BY_USER" id="ecs-fargate-task-termination-detection-event-rule.DefaultExcludedStoppedReasonPrefixes.property.TASK_STOPPED_BY_USER"></a>
+
+```typescript
+public readonly TASK_STOPPED_BY_USER: string;
+```
+
+- *Type:* string
+
+Console/API stop (`stopCode` = `UserInitiated`).
+
+---
 
 
 ## Enums <a name="Enums" id="Enums"></a>

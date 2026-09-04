@@ -27,7 +27,11 @@ exports[`EcsFargateTaskTerminationDetectionNotificationEventRule Testing should 
                 "stoppedReason": [
                   {
                     "anything-but": {
-                      "prefix": "Scaling activity initiated by",
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
                     },
                   },
                 ],
