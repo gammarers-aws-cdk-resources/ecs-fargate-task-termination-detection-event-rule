@@ -18,7 +18,8 @@ An AWS CDK construct that creates an Amazon EventBridge rule to detect ECS/Farga
   - `stoppedReason` prefixes such as `CannotPullContainerError` and `ResourceInitializationError`
 - Supports `detectionMode` to narrow matching to exit-code-only or startup-failure-only
 - Supports `excludedStoppedReasonPrefixes` to replace or extend the default operational-stop exclusions
-- Scopes matching to a specific ECS cluster via `clusterArn`
+- Scopes matching to a specific ECS cluster via `clusterArn`, and always to `launchType` `FARGATE`
+- Optionally narrows that cluster to one service (`serviceName`), raw task group (`group`), or task definition (`taskDefinitionArn`)
 - Owns its own `eventPattern` (`props.eventPattern` is not allowed)
 
 ## Installation
@@ -59,6 +60,14 @@ const rule = new EcsFargateTaskTerminationDetectionEventRule(stack, 'EcsFargateT
 });
 rule.addTarget(new SnsTopic(alertTopic));
 
+// Optional: watch one Fargate service and one task definition revision
+const serviceRule = new EcsFargateTaskTerminationDetectionEventRule(stack, 'ServiceScopedRule', {
+  clusterArn,
+  serviceName: 'example-api',
+  taskDefinitionArn: 'arn:aws:ecs:us-east-1:123456789012:task-definition/example-api:3',
+});
+serviceRule.addTarget(new SnsTopic(alertTopic));
+
 // Optional: narrow matching to non-zero exit codes only
 const exitCodeOnlyRule = new EcsFargateTaskTerminationDetectionEventRule(stack, 'ExitCodeOnlyRule', {
   clusterArn,
@@ -88,7 +97,7 @@ You can also pass `targets` in the constructor (`RuleProps`) instead of calling 
 
 ## Detection scope
 
-The rule matches `ECS Task State Change` events for the given `clusterArn` where `lastStatus` is `STOPPED`. Default `detectionMode` is `ALL_FAILURES`.
+The rule matches `ECS Task State Change` events for the given `clusterArn` where `launchType` is `FARGATE` and `lastStatus` is `STOPPED`. Default `detectionMode` is `ALL_FAILURES`. EC2 and EXTERNAL tasks in the same cluster do not match. Fargate Spot tasks still match, because their `launchType` remains `FARGATE` (`capacityProviderName` is `FARGATE_SPOT`). Spot reclaim is excluded on the non-zero exit-code branch by the default `stoppedReason` prefixes.
 
 ### Matched
 
@@ -115,7 +124,8 @@ Startup-failure matching does not apply these exclusions.
 - **Startup/pull failures in `NON_ZERO_EXIT_CODE` mode**: `CannotPullContainerError`, `ResourceInitializationError`, and `TaskFailedToStart` usually have no `containers.exitCode`, so they are dropped unless you use `ALL_FAILURES` (default) or `TASK_FAILED_TO_START`.
 - **Other startup errors without `TaskFailedToStart`**: `stoppedReason` values that do not start with the two known prefixes (for example some `CannotStartContainerError` / timeout messages) are not matched.
 - **Exit code `0`**: successful container exit is never treated as a failure.
-- **Other clusters, or `lastStatus` other than `STOPPED`**: the pattern is scoped to one cluster and to `STOPPED` only.
+- **Other clusters, non-Fargate launch types, or `lastStatus` other than `STOPPED`**: the pattern is scoped to one cluster, to `launchType` `FARGATE`, and to `STOPPED` only.
+- **Other services, groups, or task definitions**: when `serviceName`, `group`, or `taskDefinitionArn` is set, events outside that identity do not match. `taskDefinitionArn` is an exact match, including the revision when the event has one.
 - **Operational stops with no exit code**: Spot / user / scale-in events that never set `containers.exitCode` do not match the exit-code branch (and are not startup failures). That is intentional.
 
 ### False positives and limits
@@ -126,7 +136,10 @@ Startup-failure matching does not apply these exclusions.
 
 ## Options
 
-- `clusterArn` (required): ARN of the ECS cluster to monitor
+- `clusterArn` (required): ARN of the ECS cluster to monitor. Matching is always limited to `launchType` `FARGATE` inside that cluster
+- `serviceName` (optional): ECS service name. Matched as `detail.group` = `service:${serviceName}`. Do not include the `service:` prefix. Cannot be set together with `group`
+- `group` (optional): Raw ECS task group, matched exactly against `detail.group`. Use this for a non-service group. For a service, use `serviceName`. Cannot be set together with `serviceName`
+- `taskDefinitionArn` (optional): Task definition ARN, matched exactly against `detail.taskDefinitionArn`. Include the revision when events carry one (`.../family:revision`)
 - `detectionMode` (optional): Failure matching strategy. Defaults to `EcsFargateTaskTerminationDetectionMode.ALL_FAILURES`
   - `ALL_FAILURES`: non-zero `exitCode` **or** startup/pull failures (`stopCode` = `TaskFailedToStart` / known `stoppedReason` prefixes)
   - `NON_ZERO_EXIT_CODE`: only non-zero container exit codes
