@@ -51,4 +51,6 @@ junit.xml
 !/projenrc/tsconfig.json
 .jsii
 !/API.md
+!/.editorconfig
+!/.devcontainer/devcontainer.json
 !/.projenrc.ts
