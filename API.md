@@ -12,7 +12,7 @@ failures where `exitCode` is absent (for example `CannotPullContainerError`
 to narrow the match if needed.
 
 Excluded `stoppedReason` prefixes default to
-{@link DefaultExcludedStoppedReasonPrefixes.ALL} and can be replaced or
+{@link DefaultExcludedStoppedReasonPrefixes.ALL } and can be replaced or
 extended via
 {@link EcsFargateTaskTerminationDetectionEventRuleProps.excludedStoppedReasonPrefixes}.
 
@@ -398,7 +398,7 @@ Uniquely identifies this class.
 
 ### EcsFargateTaskTerminationDetectionEventRuleProps <a name="EcsFargateTaskTerminationDetectionEventRuleProps" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps"></a>
 
-Properties for {@link EcsFargateTaskTerminationDetectionEventRule}.
+Properties for {@link EcsFargateTaskTerminationDetectionEventRule }.
 
 Extends EventBridge {@link RuleProps}, except `eventPattern` which must not
 be set (this construct always owns the pattern).
@@ -767,7 +767,7 @@ Console/API stop (`stopCode` = `UserInitiated`).
 
 ### EcsFargateTaskTerminationDetectionMode <a name="EcsFargateTaskTerminationDetectionMode" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode"></a>
 
-How {@link EcsFargateTaskTerminationDetectionEventRule} matches ECS/Fargate task failure events in its EventBridge pattern.
+How {@link EcsFargateTaskTerminationDetectionEventRule } matches ECS/Fargate task failure events in its EventBridge pattern.
 
 #### Members <a name="Members" id="Members"></a>
 
