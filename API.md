@@ -12,12 +12,14 @@ failures where `exitCode` is absent (for example `CannotPullContainerError`
 to narrow the match if needed.
 
 Excluded `stoppedReason` prefixes default to
-{@link DefaultExcludedStoppedReasonPrefixes.ALL} and can be replaced or
+{@link DefaultExcludedStoppedReasonPrefixes.ALL } and can be replaced or
 extended via
 {@link EcsFargateTaskTerminationDetectionEventRuleProps.excludedStoppedReasonPrefixes}.
 
 This rule defines its own `eventPattern` and does not accept `props.eventPattern`.
-The pattern is scoped to the given `clusterArn`.
+The pattern is scoped to the given `clusterArn` and to `launchType` `FARGATE`.
+Optional `serviceName`, `group`, and `taskDefinitionArn` narrow that scope
+further.
 
 #### Initializers <a name="Initializers" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRule.Initializer"></a>
 
@@ -396,7 +398,7 @@ Uniquely identifies this class.
 
 ### EcsFargateTaskTerminationDetectionEventRuleProps <a name="EcsFargateTaskTerminationDetectionEventRuleProps" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps"></a>
 
-Properties for {@link EcsFargateTaskTerminationDetectionEventRule}.
+Properties for {@link EcsFargateTaskTerminationDetectionEventRule }.
 
 Extends EventBridge {@link RuleProps}, except `eventPattern` which must not
 be set (this construct always owns the pattern).
@@ -425,6 +427,9 @@ const ecsFargateTaskTerminationDetectionEventRuleProps: EcsFargateTaskTerminatio
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.clusterArn">clusterArn</a></code> | <code>string</code> | ARN of the ECS cluster to monitor. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.detectionMode">detectionMode</a></code> | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode">EcsFargateTaskTerminationDetectionMode</a></code> | How task failures are matched in the EventBridge event pattern. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.excludedStoppedReasonPrefixes">excludedStoppedReasonPrefixes</a></code> | <code>string[]</code> | `stoppedReason` prefixes excluded from non-zero exit-code matching via EventBridge `anything-but` prefix matching. |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.group">group</a></code> | <code>string</code> | Raw ECS task group used to narrow matching. |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.serviceName">serviceName</a></code> | <code>string</code> | ECS service name used to narrow matching to one service. |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.taskDefinitionArn">taskDefinitionArn</a></code> | <code>string</code> | Task definition ARN used to narrow matching. |
 
 ---
 
@@ -575,8 +580,10 @@ public readonly clusterArn: string;
 
 ARN of the ECS cluster to monitor.
 
-Used to scope the EventBridge rule to task state change events from the
-specified cluster.
+The rule matches only tasks in this cluster whose `launchType` is
+`FARGATE`. EC2 and EXTERNAL tasks in the same cluster are ignored.
+Fargate Spot tasks stay in scope because their `launchType` remains
+`FARGATE` (`capacityProviderName` is `FARGATE_SPOT`).
 
 ---
 
@@ -611,6 +618,58 @@ matching is unchanged.
 Pass a new array to replace the default set. To extend defaults, spread
 {@link DefaultExcludedStoppedReasonPrefixes.ALL} and append prefixes.
 Pass an empty array to disable exclusion.
+
+---
+
+##### `group`<sup>Optional</sup> <a name="group" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.group"></a>
+
+```typescript
+public readonly group: string;
+```
+
+- *Type:* string
+
+Raw ECS task group used to narrow matching.
+
+Matched exactly against `detail.group`. Use this for a non-service task
+group. For an ECS service, use
+{@link EcsFargateTaskTerminationDetectionEventRuleProps.serviceName}.
+
+Cannot be set together with {@link EcsFargateTaskTerminationDetectionEventRuleProps.serviceName}.
+
+---
+
+##### `serviceName`<sup>Optional</sup> <a name="serviceName" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.serviceName"></a>
+
+```typescript
+public readonly serviceName: string;
+```
+
+- *Type:* string
+
+ECS service name used to narrow matching to one service.
+
+Matched as `detail.group` equal to `service:${serviceName}`. Omit to
+match every Fargate task in the cluster. Pass the service name only,
+without the `service:` prefix.
+
+Cannot be set together with {@link EcsFargateTaskTerminationDetectionEventRuleProps.group}.
+
+---
+
+##### `taskDefinitionArn`<sup>Optional</sup> <a name="taskDefinitionArn" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.taskDefinitionArn"></a>
+
+```typescript
+public readonly taskDefinitionArn: string;
+```
+
+- *Type:* string
+
+Task definition ARN used to narrow matching.
+
+Matched exactly against `detail.taskDefinitionArn`. Include the revision
+when events carry one
+(`arn:aws:ecs:region:account:task-definition/family:revision`).
 
 ---
 
@@ -708,7 +767,7 @@ Console/API stop (`stopCode` = `UserInitiated`).
 
 ### EcsFargateTaskTerminationDetectionMode <a name="EcsFargateTaskTerminationDetectionMode" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode"></a>
 
-How {@link EcsFargateTaskTerminationDetectionEventRule} matches ECS/Fargate task failure events in its EventBridge pattern.
+How {@link EcsFargateTaskTerminationDetectionEventRule } matches ECS/Fargate task failure events in its EventBridge pattern.
 
 #### Members <a name="Members" id="Members"></a>
 
