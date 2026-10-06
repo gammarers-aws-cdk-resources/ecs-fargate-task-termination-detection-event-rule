@@ -51,6 +51,7 @@ describe('EcsFargateTaskTerminationDetectionNotificationEventRule Testing', () =
         'detail-type': ['ECS Task State Change'],
         'detail': {
           clusterArn,
+          launchType: ['FARGATE'],
           lastStatus: ['STOPPED'],
           $or: [
             {
@@ -105,6 +106,7 @@ describe('EcsFargateTaskTerminationDetectionNotificationEventRule Testing', () =
         'detail-type': ['ECS Task State Change'],
         'detail': {
           clusterArn,
+          launchType: ['FARGATE'],
           lastStatus: ['STOPPED'],
           containers: {
             exitCode: [
@@ -133,6 +135,7 @@ describe('EcsFargateTaskTerminationDetectionNotificationEventRule Testing', () =
         'detail-type': ['ECS Task State Change'],
         'detail': {
           clusterArn,
+          launchType: ['FARGATE'],
           lastStatus: ['STOPPED'],
           $or: [
             {
@@ -164,6 +167,7 @@ describe('EcsFargateTaskTerminationDetectionNotificationEventRule Testing', () =
         'detail-type': ['ECS Task State Change'],
         'detail': {
           clusterArn,
+          launchType: ['FARGATE'],
           lastStatus: ['STOPPED'],
           $or: [
             {
@@ -210,6 +214,7 @@ describe('EcsFargateTaskTerminationDetectionNotificationEventRule Testing', () =
         'detail-type': ['ECS Task State Change'],
         'detail': {
           clusterArn,
+          launchType: ['FARGATE'],
           lastStatus: ['STOPPED'],
           $or: [
             {
@@ -261,6 +266,7 @@ describe('EcsFargateTaskTerminationDetectionNotificationEventRule Testing', () =
         'detail-type': ['ECS Task State Change'],
         'detail': {
           clusterArn,
+          launchType: ['FARGATE'],
           lastStatus: ['STOPPED'],
           containers: {
             exitCode: [
@@ -270,6 +276,218 @@ describe('EcsFargateTaskTerminationDetectionNotificationEventRule Testing', () =
         },
       }),
     });
+  });
+
+  it('should narrow matching to one ECS service when serviceName is set', () => {
+    const serviceStack = createTestStack('ServiceNameStack');
+
+    new EcsFargateTaskTerminationDetectionEventRule(serviceStack, 'ServiceNameRule', {
+      clusterArn,
+      serviceName: 'example-api',
+    });
+
+    Template.fromStack(serviceStack).hasResourceProperties('AWS::Events::Rule', {
+      EventPattern: Match.objectEquals({
+        'source': ['aws.ecs'],
+        'detail-type': ['ECS Task State Change'],
+        'detail': {
+          clusterArn,
+          launchType: ['FARGATE'],
+          group: ['service:example-api'],
+          lastStatus: ['STOPPED'],
+          $or: [
+            {
+              containers: {
+                exitCode: [
+                  { 'anything-but': 0 },
+                ],
+              },
+              stoppedReason: [
+                defaultStoppedReasonExclusion,
+              ],
+            },
+            {
+              stopCode: ['TaskFailedToStart'],
+            },
+            {
+              stoppedReason: [
+                { prefix: 'CannotPullContainerError' },
+                { prefix: 'ResourceInitializationError' },
+              ],
+            },
+          ],
+        },
+      }),
+    });
+  });
+
+  it('should narrow matching to a raw task group when group is set', () => {
+    const groupStack = createTestStack('TaskGroupStack');
+
+    new EcsFargateTaskTerminationDetectionEventRule(groupStack, 'TaskGroupRule', {
+      clusterArn,
+      group: 'family:example-worker',
+    });
+
+    Template.fromStack(groupStack).hasResourceProperties('AWS::Events::Rule', {
+      EventPattern: Match.objectEquals({
+        'source': ['aws.ecs'],
+        'detail-type': ['ECS Task State Change'],
+        'detail': {
+          clusterArn,
+          launchType: ['FARGATE'],
+          group: ['family:example-worker'],
+          lastStatus: ['STOPPED'],
+          $or: [
+            {
+              containers: {
+                exitCode: [
+                  { 'anything-but': 0 },
+                ],
+              },
+              stoppedReason: [
+                defaultStoppedReasonExclusion,
+              ],
+            },
+            {
+              stopCode: ['TaskFailedToStart'],
+            },
+            {
+              stoppedReason: [
+                { prefix: 'CannotPullContainerError' },
+                { prefix: 'ResourceInitializationError' },
+              ],
+            },
+          ],
+        },
+      }),
+    });
+  });
+
+  it('should narrow matching to a task definition when taskDefinitionArn is set', () => {
+    const taskDefinitionStack = createTestStack('TaskDefinitionArnStack');
+    const taskDefinitionArn = 'arn:aws:ecs:us-east-1:123456789012:task-definition/example-api:3';
+
+    new EcsFargateTaskTerminationDetectionEventRule(taskDefinitionStack, 'TaskDefinitionArnRule', {
+      clusterArn,
+      taskDefinitionArn,
+    });
+
+    Template.fromStack(taskDefinitionStack).hasResourceProperties('AWS::Events::Rule', {
+      EventPattern: Match.objectEquals({
+        'source': ['aws.ecs'],
+        'detail-type': ['ECS Task State Change'],
+        'detail': {
+          clusterArn,
+          launchType: ['FARGATE'],
+          taskDefinitionArn: [taskDefinitionArn],
+          lastStatus: ['STOPPED'],
+          $or: [
+            {
+              containers: {
+                exitCode: [
+                  { 'anything-but': 0 },
+                ],
+              },
+              stoppedReason: [
+                defaultStoppedReasonExclusion,
+              ],
+            },
+            {
+              stopCode: ['TaskFailedToStart'],
+            },
+            {
+              stoppedReason: [
+                { prefix: 'CannotPullContainerError' },
+                { prefix: 'ResourceInitializationError' },
+              ],
+            },
+          ],
+        },
+      }),
+    });
+  });
+
+  it('should apply serviceName and taskDefinitionArn together', () => {
+    const combinedStack = createTestStack('CombinedScopeStack');
+    const taskDefinitionArn = 'arn:aws:ecs:us-east-1:123456789012:task-definition/example-api:3';
+
+    new EcsFargateTaskTerminationDetectionEventRule(combinedStack, 'CombinedScopeRule', {
+      clusterArn,
+      serviceName: 'example-api',
+      taskDefinitionArn,
+    });
+
+    Template.fromStack(combinedStack).hasResourceProperties('AWS::Events::Rule', {
+      EventPattern: Match.objectEquals({
+        'source': ['aws.ecs'],
+        'detail-type': ['ECS Task State Change'],
+        'detail': {
+          clusterArn,
+          launchType: ['FARGATE'],
+          group: ['service:example-api'],
+          taskDefinitionArn: [taskDefinitionArn],
+          lastStatus: ['STOPPED'],
+          $or: [
+            {
+              containers: {
+                exitCode: [
+                  { 'anything-but': 0 },
+                ],
+              },
+              stoppedReason: [
+                defaultStoppedReasonExclusion,
+              ],
+            },
+            {
+              stopCode: ['TaskFailedToStart'],
+            },
+            {
+              stoppedReason: [
+                { prefix: 'CannotPullContainerError' },
+                { prefix: 'ResourceInitializationError' },
+              ],
+            },
+          ],
+        },
+      }),
+    });
+  });
+
+  it('should throw when serviceName and group are both set', () => {
+    expect(() => {
+      new EcsFargateTaskTerminationDetectionEventRule(stack, 'ConflictingScopeRule', {
+        clusterArn,
+        serviceName: 'example-api',
+        group: 'service:example-api',
+      });
+    }).toThrow(
+      'serviceName and group cannot both be set. Use serviceName for an ECS service, or group for a raw task group.',
+    );
+  });
+
+  it.each([
+    ['serviceName', { serviceName: '' }],
+    ['group', { group: '' }],
+    ['taskDefinitionArn', { taskDefinitionArn: '' }],
+  ])('should throw when %s is empty', (propertyName, scopeProps) => {
+    expect(() => {
+      new EcsFargateTaskTerminationDetectionEventRule(stack, `Empty${propertyName}Rule`, {
+        clusterArn,
+        ...scopeProps,
+      });
+    }).toThrow(`${propertyName} must not be empty.`);
+  });
+
+  it('should throw when serviceName includes the service: prefix', () => {
+    expect(() => {
+      new EcsFargateTaskTerminationDetectionEventRule(stack, 'PrefixedServiceNameRule', {
+        clusterArn,
+        serviceName: 'service:example-api',
+      });
+    }).toThrow(
+      'serviceName must be the ECS service name without the "service:" prefix. Use group to match a raw task group.',
+    );
   });
 
   it('should throw when eventPattern is provided', () => {

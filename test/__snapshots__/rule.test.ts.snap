@@ -56,6 +56,9 @@ exports[`EcsFargateTaskTerminationDetectionNotificationEventRule Testing should 
             "lastStatus": [
               "STOPPED",
             ],
+            "launchType": [
+              "FARGATE",
+            ],
           },
           "detail-type": [
             "ECS Task State Change",

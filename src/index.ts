@@ -1,5 +1,11 @@
+import { LaunchType } from 'aws-cdk-lib/aws-ecs';
 import { EventPattern, Rule, RuleProps } from 'aws-cdk-lib/aws-events';
 import { Construct } from 'constructs';
+
+/**
+ * Prefix ECS writes on `detail.group` for tasks that belong to a service.
+ */
+const ECS_SERVICE_GROUP_PREFIX = 'service:';
 
 /**
  * How {@link EcsFargateTaskTerminationDetectionEventRule} matches ECS/Fargate
@@ -81,10 +87,43 @@ export interface EcsFargateTaskTerminationDetectionEventRuleProps extends RulePr
   /**
    * ARN of the ECS cluster to monitor.
    *
-   * Used to scope the EventBridge rule to task state change events from the
-   * specified cluster.
+   * The rule matches only tasks in this cluster whose `launchType` is
+   * `FARGATE`. EC2 and EXTERNAL tasks in the same cluster are ignored.
+   * Fargate Spot tasks stay in scope because their `launchType` remains
+   * `FARGATE` (`capacityProviderName` is `FARGATE_SPOT`).
    */
   readonly clusterArn: string;
+
+  /**
+   * ECS service name used to narrow matching to one service.
+   *
+   * Matched as `detail.group` equal to `service:${serviceName}`. Omit to
+   * match every Fargate task in the cluster. Pass the service name only,
+   * without the `service:` prefix.
+   *
+   * Cannot be set together with {@link EcsFargateTaskTerminationDetectionEventRuleProps.group}.
+   */
+  readonly serviceName?: string;
+
+  /**
+   * Raw ECS task group used to narrow matching.
+   *
+   * Matched exactly against `detail.group`. Use this for a non-service task
+   * group. For an ECS service, use
+   * {@link EcsFargateTaskTerminationDetectionEventRuleProps.serviceName}.
+   *
+   * Cannot be set together with {@link EcsFargateTaskTerminationDetectionEventRuleProps.serviceName}.
+   */
+  readonly group?: string;
+
+  /**
+   * Task definition ARN used to narrow matching.
+   *
+   * Matched exactly against `detail.taskDefinitionArn`. Include the revision
+   * when events carry one
+   * (`arn:aws:ecs:region:account:task-definition/family:revision`).
+   */
+  readonly taskDefinitionArn?: string;
 
   /**
    * How task failures are matched in the EventBridge event pattern.
@@ -220,24 +259,131 @@ const STARTUP_FAILURE_OR_CONDITIONS = [
 ];
 
 /**
+ * Optional task identity filters. `launchType` is not included: this construct
+ * always matches `FARGATE`.
+ */
+interface TaskScopeFilters {
+  readonly serviceName?: string;
+  readonly group?: string;
+  readonly taskDefinitionArn?: string;
+}
+
+/**
+ * Rejects an empty scope value.
+ *
+ * @param name - Property name used in the error message.
+ * @param value - Caller-supplied value.
+ * @throws Error if `value` is an empty string.
+ */
+const assertNonEmptyScopeValue = (name: string, value: string): void => {
+  if (value.length === 0) {
+    throw new Error(`${name} must not be empty.`);
+  }
+};
+
+/**
+ * Resolves the EventBridge `detail.group` value from `serviceName` or `group`.
+ *
+ * @param serviceName - ECS service name, prefixed with `service:` when set.
+ * @param group - Raw task group, used as-is when set.
+ * @returns Group value to match, or `undefined` when neither filter is set.
+ * @throws Error if both filters are set, if either value is empty, or if
+ *   `serviceName` already starts with `service:`.
+ */
+const resolveTaskGroup = (
+  serviceName: string | undefined,
+  group: string | undefined,
+): string | undefined => {
+  if (serviceName !== undefined && group !== undefined) {
+    throw new Error(
+      'serviceName and group cannot both be set. Use serviceName for an ECS service, or group for a raw task group.',
+    );
+  }
+
+  if (serviceName !== undefined) {
+    assertNonEmptyScopeValue('serviceName', serviceName);
+    if (serviceName.startsWith(ECS_SERVICE_GROUP_PREFIX)) {
+      throw new Error(
+        'serviceName must be the ECS service name without the "service:" prefix. Use group to match a raw task group.',
+      );
+    }
+    return `${ECS_SERVICE_GROUP_PREFIX}${serviceName}`;
+  }
+
+  if (group !== undefined) {
+    assertNonEmptyScopeValue('group', group);
+    return group;
+  }
+
+  return undefined;
+};
+
+/**
+ * Resolves the task definition ARN filter.
+ *
+ * @param taskDefinitionArn - Caller-supplied ARN, or `undefined` to skip the filter.
+ * @returns ARN to match, or `undefined` when the filter is omitted.
+ * @throws Error if `taskDefinitionArn` is an empty string.
+ */
+const resolveTaskDefinitionArn = (
+  taskDefinitionArn: string | undefined,
+): string | undefined => {
+  if (taskDefinitionArn === undefined) {
+    return undefined;
+  }
+
+  assertNonEmptyScopeValue('taskDefinitionArn', taskDefinitionArn);
+  return taskDefinitionArn;
+};
+
+/**
+ * Builds the always-on task scope fields for the EventBridge `detail` filter.
+ *
+ * `launchType` is fixed to `FARGATE` so EC2 and EXTERNAL tasks in the same
+ * cluster do not match. Fargate Spot remains included because its launch type
+ * is still `FARGATE`.
+ *
+ * @param clusterArn - ECS cluster ARN used to scope matching events.
+ * @param scope - Optional service, task group, and task definition filters.
+ * @returns `detail` fields shared by every detection mode.
+ */
+const buildScopeDetail = (
+  clusterArn: string,
+  scope: TaskScopeFilters,
+): Record<string, unknown> => {
+  const taskGroup = resolveTaskGroup(scope.serviceName, scope.group);
+  const taskDefinitionArn = resolveTaskDefinitionArn(scope.taskDefinitionArn);
+
+  return {
+    clusterArn,
+    launchType: [LaunchType.FARGATE],
+    ...(taskGroup === undefined ? {} : { group: [taskGroup] }),
+    ...(taskDefinitionArn === undefined ? {} : { taskDefinitionArn: [taskDefinitionArn] }),
+    lastStatus: ['STOPPED'],
+  };
+};
+
+/**
  * Builds the EventBridge `detail` filter for the selected detection mode.
  *
  * @param clusterArn - ECS cluster ARN used to scope matching events.
  * @param detectionMode - Failure matching strategy.
  * @param excludedStoppedReasonPrefixes - `stoppedReason` prefixes excluded from
  *   non-zero exit-code matching.
+ * @param scope - Optional service, task group, and task definition filters.
  * @returns Event pattern `detail` object for the given mode.
  * @throws Error if `detectionMode` is unsupported.
+ * @throws Error if `scope.serviceName` and `scope.group` are both set.
+ * @throws Error if a scope value is an empty string, or if `scope.serviceName`
+ *   starts with `service:`.
  */
 const buildFailureDetail = (
   clusterArn: string,
   detectionMode: EcsFargateTaskTerminationDetectionMode,
   excludedStoppedReasonPrefixes: string[],
+  scope: TaskScopeFilters,
 ): Record<string, unknown> => {
-  const base = {
-    clusterArn,
-    lastStatus: ['STOPPED'],
-  };
+  const base = buildScopeDetail(clusterArn, scope);
 
   if (detectionMode === EcsFargateTaskTerminationDetectionMode.NON_ZERO_EXIT_CODE) {
     return {
@@ -273,16 +419,26 @@ const buildFailureDetail = (
  * @param detectionMode - Failure matching strategy.
  * @param excludedStoppedReasonPrefixes - `stoppedReason` prefixes excluded from
  *   non-zero exit-code matching.
+ * @param scope - Optional service, task group, and task definition filters.
  * @returns Event pattern targeting `aws.ecs` / `ECS Task State Change`.
+ * @throws Error if `scope.serviceName` and `scope.group` are both set.
+ * @throws Error if a scope value is an empty string, or if `scope.serviceName`
+ *   starts with `service:`.
  */
 const buildEventPattern = (
   clusterArn: string,
   detectionMode: EcsFargateTaskTerminationDetectionMode,
   excludedStoppedReasonPrefixes: string[],
+  scope: TaskScopeFilters,
 ): EventPattern => ({
   source: ['aws.ecs'],
   detailType: ['ECS Task State Change'],
-  detail: buildFailureDetail(clusterArn, detectionMode, excludedStoppedReasonPrefixes),
+  detail: buildFailureDetail(
+    clusterArn,
+    detectionMode,
+    excludedStoppedReasonPrefixes,
+    scope,
+  ),
 });
 
 /**
@@ -302,7 +458,9 @@ const buildEventPattern = (
  * {@link EcsFargateTaskTerminationDetectionEventRuleProps.excludedStoppedReasonPrefixes}.
  *
  * This rule defines its own `eventPattern` and does not accept `props.eventPattern`.
- * The pattern is scoped to the given `clusterArn`.
+ * The pattern is scoped to the given `clusterArn` and to `launchType` `FARGATE`.
+ * Optional `serviceName`, `group`, and `taskDefinitionArn` narrow that scope
+ * further.
  */
 export class EcsFargateTaskTerminationDetectionEventRule extends Rule {
 
@@ -315,6 +473,10 @@ export class EcsFargateTaskTerminationDetectionEventRule extends Rule {
    * @throws Error if `props.eventPattern` is provided. This construct always
    *   manages its own `eventPattern`.
    * @throws Error if `props.excludedStoppedReasonPrefixes` contains an empty string.
+   * @throws Error if `props.serviceName` and `props.group` are both set.
+   * @throws Error if `props.serviceName`, `props.group`, or
+   *   `props.taskDefinitionArn` is an empty string.
+   * @throws Error if `props.serviceName` starts with `service:`.
    */
   constructor(scope: Construct, id: string, props: EcsFargateTaskTerminationDetectionEventRuleProps) {
     const {
@@ -322,6 +484,9 @@ export class EcsFargateTaskTerminationDetectionEventRule extends Rule {
       clusterArn,
       detectionMode = EcsFargateTaskTerminationDetectionMode.ALL_FAILURES,
       excludedStoppedReasonPrefixes,
+      serviceName,
+      group,
+      taskDefinitionArn,
       ...restProps
     } = props;
 
@@ -335,7 +500,16 @@ export class EcsFargateTaskTerminationDetectionEventRule extends Rule {
 
     super(scope, id, {
       ...restProps,
-      eventPattern: buildEventPattern(clusterArn, detectionMode, resolvedExcludedPrefixes),
+      eventPattern: buildEventPattern(
+        clusterArn,
+        detectionMode,
+        resolvedExcludedPrefixes,
+        {
+          serviceName,
+          group,
+          taskDefinitionArn,
+        },
+      ),
     });
   }
 }
