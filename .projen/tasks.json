@@ -220,6 +220,16 @@
         }
       ]
     },
+    "integ": {
+      "name": "integ",
+      "description": "Run integration tests against the real Amazon EventBridge (needs AWS credentials)",
+      "steps": [
+        {
+          "exec": "jest --coverage=false --testPathPattern=test/integ --testPathIgnorePatterns=/node_modules/ --testTimeout=60000",
+          "receiveArgs": true
+        }
+      ]
+    },
     "package": {
       "name": "package",
       "description": "Creates the distribution package",
@@ -376,6 +386,7 @@
           "execArgs": [
             "npm",
             "update",
+            "@aws-sdk/client-eventbridge",
             "@gammarers/projen-projects",
             "@stylistic/eslint-plugin",
             "@types/jest",
