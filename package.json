@@ -16,6 +16,7 @@
     "docgen": "projen docgen",
     "eject": "projen eject",
     "eslint": "projen eslint",
+    "integ": "projen integ",
     "package": "projen package",
     "package-all": "projen package-all",
     "package:js": "projen package:js",
@@ -36,6 +37,7 @@
     "organization": false
   },
   "devDependencies": {
+    "@aws-sdk/client-eventbridge": "^3",
     "@gammarers/projen-projects": "^0.5.1",
     "@stylistic/eslint-plugin": "^2",
     "@types/jest": "^29.5.14",
@@ -108,10 +110,12 @@
     ],
     "coverageDirectory": "coverage",
     "coveragePathIgnorePatterns": [
-      "/node_modules/"
+      "/node_modules/",
+      "/test/integ/"
     ],
     "testPathIgnorePatterns": [
-      "/node_modules/"
+      "/node_modules/",
+      "/test/integ/"
     ],
     "watchPathIgnorePatterns": [
       "/node_modules/"

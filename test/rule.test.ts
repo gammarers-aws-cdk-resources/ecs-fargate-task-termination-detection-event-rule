@@ -6,10 +6,11 @@ import {
   EcsFargateTaskTerminationDetectionEventRule,
   EcsFargateTaskTerminationDetectionMode,
 } from '../src';
+import { CLUSTER_ARN, SERVICE_NAME, TASK_EVENT_CASES } from './fixtures/task-events';
 import { eventMatchesPattern, readEventPattern } from './match-event-pattern';
 import { buildEventPattern } from '../src/core/event-pattern';
 
-const clusterArn = 'arn:aws:ecs:us-east-1:123456789012:cluster/example-app-cluster';
+const clusterArn = CLUSTER_ARN;
 
 const createTestStack = (id: string): Stack => {
   const app = new App();
@@ -50,7 +51,7 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
   const serviceMatchStack = createTestStack('ServiceMatchStack');
   new EcsFargateTaskTerminationDetectionEventRule(serviceMatchStack, 'ServiceMatchRule', {
     clusterArn,
-    serviceName: 'example-api',
+    serviceName: SERVICE_NAME,
   });
   const servicePattern = readEventPattern(Template.fromStack(serviceMatchStack).toJSON());
 
@@ -705,139 +706,8 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
     });
   });
 
-  const taskEvent = (detail: Record<string, unknown>): Record<string, unknown> => ({
-    'source': 'aws.ecs',
-    'detail-type': 'ECS Task State Change',
-    'detail': {
-      clusterArn,
-      launchType: 'FARGATE',
-      lastStatus: 'STOPPED',
-      group: 'service:example-api',
-      ...detail,
-    },
-  });
-
-  it.each([
-    {
-      name: 'matches a non-zero container exit',
-      pattern: 'default',
-      event: taskEvent({
-        containers: [{ name: 'app', exitCode: 1 }],
-        stoppedReason: 'Essential container in task exited',
-        stopCode: 'EssentialContainerExited',
-      }),
-      expectation: 'match',
-    },
-    {
-      name: 'matches TaskFailedToStart without an exit code',
-      pattern: 'default',
-      event: taskEvent({
-        stoppedReason: 'Task failed to start',
-        stopCode: 'TaskFailedToStart',
-      }),
-      expectation: 'match',
-    },
-    {
-      name: 'matches CannotPullContainerError without an exit code',
-      pattern: 'default',
-      event: taskEvent({
-        stoppedReason: 'CannotPullContainerError: pull access denied',
-      }),
-      expectation: 'match',
-    },
-    {
-      name: 'matches a Fargate Spot task that exits non-zero',
-      pattern: 'default',
-      event: taskEvent({
-        capacityProviderName: 'FARGATE_SPOT',
-        containers: [{ name: 'app', exitCode: 1 }],
-        stoppedReason: 'Essential container in task exited',
-        stopCode: 'EssentialContainerExited',
-      }),
-      expectation: 'match',
-    },
-    {
-      name: 'ignores exit code 0',
-      pattern: 'default',
-      event: taskEvent({
-        containers: [{ name: 'app', exitCode: 0 }],
-        stoppedReason: 'Essential container in task exited',
-        stopCode: 'EssentialContainerExited',
-      }),
-      expectation: 'miss',
-    },
-    {
-      name: 'ignores scale-in with a non-zero exit',
-      pattern: 'default',
-      event: taskEvent({
-        containers: [{ name: 'app', exitCode: 143 }],
-        stoppedReason: 'Scaling activity initiated by (deployment ecs-svc/123)',
-        stopCode: 'ServiceSchedulerInitiated',
-      }),
-      expectation: 'miss',
-    },
-    {
-      name: 'ignores a user stop with a non-zero exit',
-      pattern: 'default',
-      event: taskEvent({
-        containers: [{ name: 'app', exitCode: 143 }],
-        stoppedReason: 'Task stopped by user',
-        stopCode: 'UserInitiated',
-      }),
-      expectation: 'miss',
-    },
-    {
-      name: 'ignores Fargate Spot reclaim',
-      pattern: 'default',
-      event: taskEvent({
-        capacityProviderName: 'FARGATE_SPOT',
-        containers: [{ name: 'app', exitCode: 143 }],
-        stoppedReason: 'Your Spot Task was interrupted.',
-        stopCode: 'SpotInterruption',
-      }),
-      expectation: 'miss',
-    },
-    {
-      name: 'ignores an EC2 task',
-      pattern: 'default',
-      event: taskEvent({
-        launchType: 'EC2',
-        containers: [{ name: 'app', exitCode: 1 }],
-        stoppedReason: 'Essential container in task exited',
-      }),
-      expectation: 'miss',
-    },
-    {
-      name: 'ignores another cluster',
-      pattern: 'default',
-      event: taskEvent({
-        clusterArn: 'arn:aws:ecs:us-east-1:123456789012:cluster/other',
-        containers: [{ name: 'app', exitCode: 1 }],
-        stoppedReason: 'Essential container in task exited',
-      }),
-      expectation: 'miss',
-    },
-    {
-      name: 'matches the selected service',
-      pattern: 'service',
-      event: taskEvent({
-        containers: [{ name: 'app', exitCode: 1 }],
-        stoppedReason: 'Essential container in task exited',
-      }),
-      expectation: 'match',
-    },
-    {
-      name: 'ignores another service',
-      pattern: 'service',
-      event: taskEvent({
-        group: 'service:other',
-        containers: [{ name: 'app', exitCode: 1 }],
-        stoppedReason: 'Essential container in task exited',
-      }),
-      expectation: 'miss',
-    },
-  ])('$name', ({ pattern, event, expectation }) => {
-    const eventPattern = pattern === 'default' ? defaultPattern : servicePattern;
+  it.each(TASK_EVENT_CASES)('$name', ({ rule: sampleRule, event, expectation }) => {
+    const eventPattern = sampleRule === 'default' ? defaultPattern : servicePattern;
     const matched = eventMatchesPattern(event, eventPattern);
 
     expect(matched).toBe(expectation === 'match');

@@ -1,6 +1,11 @@
 {
   "dependencies": [
     {
+      "name": "@aws-sdk/client-eventbridge",
+      "version": "^3",
+      "type": "build"
+    },
+    {
       "name": "@gammarers/projen-projects",
       "version": "^0.5.1",
       "type": "build"

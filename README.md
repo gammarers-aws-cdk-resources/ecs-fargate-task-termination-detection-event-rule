@@ -170,6 +170,23 @@ See [API.md](API.md).
 - AWS CDK `aws-cdk-lib` `^2.232.0`
 - `constructs` `^10.5.1`
 
+## Notes
+
+### Integration tests
+
+`npx projen test` checks the event pattern with a local matcher only. To check it against the real Amazon EventBridge, run:
+
+```bash
+npx projen integ
+```
+
+The tests send the synthesized patterns and sample ECS events to the [`TestEventPattern`](https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_TestEventPattern.html) API. EventBridge validates each pattern and reports whether an event matches it. They also check that the local matcher agrees with EventBridge.
+
+- No rule or other resource is created, so nothing needs cleanup.
+- AWS credentials are required, and they only need the `events:TestEventPattern` permission.
+- The region comes from `AWS_REGION` or `AWS_DEFAULT_REGION`, and falls back to `us-east-1`.
+- They are excluded from `npx projen test` and from the pull request build, which have no AWS credentials.
+
 ## License
 
 This project is licensed under the Apache-2.0 License.

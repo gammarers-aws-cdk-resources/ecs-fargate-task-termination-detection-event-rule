@@ -9,7 +9,25 @@ const project = new ProjenCdkConstructLibrary({
   repositoryUrl: 'https://github.com/gammarers-aws-cdk-resources/ecs-fargate-task-termination-detection-event-rule.git',
   devDeps: [
     '@gammarers/projen-projects@^0.5.1',
+    '@aws-sdk/client-eventbridge@^3',
   ],
 });
+
+// Integration tests call the real EventBridge `TestEventPattern` API, so they
+// need AWS credentials. Keep them out of `projen test` and the PR build.
+const INTEG_TEST_DIR = 'test/integ';
+project.jest?.addIgnorePattern(`/${INTEG_TEST_DIR}/`);
+project.addTask('integ', {
+  description: 'Run integration tests against the real Amazon EventBridge (needs AWS credentials)',
+  exec: [
+    'jest',
+    '--coverage=false',
+    `--testPathPattern=${INTEG_TEST_DIR}`,
+    '--testPathIgnorePatterns=/node_modules/',
+    '--testTimeout=60000',
+  ].join(' '),
+  receiveArgs: true,
+});
+
 project.addPackageIgnore('/.devcontainer');
 project.synth();
