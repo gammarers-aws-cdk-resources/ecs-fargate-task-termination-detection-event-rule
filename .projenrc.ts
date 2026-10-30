@@ -16,6 +16,7 @@ const project = new ProjenCdkConstructLibrary({
 // Integration tests call the real EventBridge `TestEventPattern` API, so they
 // need AWS credentials. Keep them out of `projen test` and the PR build.
 const INTEG_TEST_DIR = 'test/integ';
+const INTEG_TEST_TIMEOUT_MS = 60_000;
 project.jest?.addIgnorePattern(`/${INTEG_TEST_DIR}/`);
 project.addTask('integ', {
   description: 'Run integration tests against the real Amazon EventBridge (needs AWS credentials)',
@@ -24,7 +25,7 @@ project.addTask('integ', {
     '--coverage=false',
     `--testPathPattern=${INTEG_TEST_DIR}`,
     '--testPathIgnorePatterns=/node_modules/',
-    '--testTimeout=60000',
+    `--testTimeout=${INTEG_TEST_TIMEOUT_MS}`,
   ].join(' '),
   receiveArgs: true,
 });

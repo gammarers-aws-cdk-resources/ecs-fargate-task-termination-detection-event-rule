@@ -184,7 +184,7 @@ The tests send the synthesized patterns and sample ECS events to the [`TestEvent
 
 - No rule or other resource is created, so nothing needs cleanup.
 - AWS credentials are required, and they only need the `events:TestEventPattern` permission.
-- The region comes from `AWS_REGION` or `AWS_DEFAULT_REGION`, and falls back to `us-east-1`.
+- The region is resolved by the AWS SDK from `AWS_REGION`, `AWS_DEFAULT_REGION`, or the shared AWS config file. The tests fail if none is set.
 - They are excluded from `npx projen test` and from the pull request build, which have no AWS credentials.
 
 ## License

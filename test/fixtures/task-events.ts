@@ -2,16 +2,12 @@
  * ECS task state change events shared by the unit tests and the integration
  * tests, so both check the same cases.
  */
+import { CLUSTER_ARN, SERVICE_NAME, TEST_ACCOUNT_ID, TEST_REGION } from './constants';
 
 /**
- * Cluster the sample rules are scoped to.
+ * Cluster other than {@link CLUSTER_ARN}, used to check the cluster scope.
  */
-export const CLUSTER_ARN = 'arn:aws:ecs:us-east-1:123456789012:cluster/example-app-cluster';
-
-/**
- * Service name used by the `service` sample rule.
- */
-export const SERVICE_NAME = 'example-api';
+const OTHER_CLUSTER_ARN = `arn:aws:ecs:${TEST_REGION}:${TEST_ACCOUNT_ID}:cluster/other`;
 
 /**
  * Sample rule an event is checked against.
@@ -152,7 +148,7 @@ export const TASK_EVENT_CASES: TaskEventCase[] = [
     name: 'ignores another cluster',
     rule: 'default',
     event: taskEvent({
-      clusterArn: 'arn:aws:ecs:us-east-1:123456789012:cluster/other',
+      clusterArn: OTHER_CLUSTER_ARN,
       containers: [{ name: 'app', exitCode: 1 }],
       stoppedReason: 'Essential container in task exited',
     }),

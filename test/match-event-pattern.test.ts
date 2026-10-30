@@ -41,6 +41,15 @@ describe('event pattern matching guards', () => {
     expect(matched).toBe(false);
   });
 
+  it('matches an object element inside a pattern array', () => {
+    const matched = eventMatchesPattern(
+      { detail: { clusterArn: 'arn' } },
+      { detail: [{ clusterArn: ['arn'] }] },
+    );
+
+    expect(matched).toBe(true);
+  });
+
   it('throws when a pattern leaf value is not an array', () => {
     expect(() => {
       eventMatchesPattern({ source: 'aws.ecs' }, { source: 'aws.ecs' });

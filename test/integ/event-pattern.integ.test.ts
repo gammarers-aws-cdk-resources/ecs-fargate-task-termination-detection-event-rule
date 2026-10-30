@@ -6,31 +6,15 @@
  * whether a sample event matches it, so no rule or other resource is created.
  *
  * Run with `npx projen integ`. It needs AWS credentials that allow
- * `events:TestEventPattern`. The region comes from `AWS_REGION` or
- * `AWS_DEFAULT_REGION`, and falls back to `us-east-1`.
+ * `events:TestEventPattern`. The SDK resolves the region from `AWS_REGION`,
+ * `AWS_DEFAULT_REGION`, or the shared AWS config file.
  */
 import { EventBridgeClient, TestEventPatternCommand } from '@aws-sdk/client-eventbridge';
-import { App, Stack } from 'aws-cdk-lib';
-import { Template } from 'aws-cdk-lib/assertions';
-import {
-  DefaultExcludedStoppedReasonPrefixes,
-  EcsFargateTaskTerminationDetectionEventRule,
-  EcsFargateTaskTerminationDetectionEventRuleProps,
-  EcsFargateTaskTerminationDetectionMode,
-} from '../../src';
-import {
-  CLUSTER_ARN,
-  SERVICE_NAME,
-  SampleRule,
-  TASK_EVENT_CASES,
-} from '../fixtures/task-events';
+import { CLUSTER_ARN, SERVICE_NAME, TEST_ACCOUNT_ID, TEST_REGION } from '../fixtures/constants';
+import { RULE_PROPS_CASES } from '../fixtures/rule-props';
+import { createTemplate } from '../fixtures/synthesize';
+import { TASK_EVENT_CASES } from '../fixtures/task-events';
 import { eventMatchesPattern, readEventPattern } from '../match-event-pattern';
-
-/**
- * Region used when neither `AWS_REGION` nor `AWS_DEFAULT_REGION` is set.
- * `TestEventPattern` is a regional API, so the tests fix a region only here.
- */
-const FALLBACK_REGION = 'us-east-1';
 
 /**
  * Exception name EventBridge returns for a pattern it rejects.
@@ -38,34 +22,39 @@ const FALLBACK_REGION = 'us-east-1';
 const INVALID_EVENT_PATTERN_EXCEPTION = 'InvalidEventPatternException';
 
 /**
+ * Total attempts per `send()`, including the first. The SDK retries throttling
+ * and transient failures, so the tests add no retry of their own.
+ */
+const MAX_ATTEMPTS = 3;
+
+/**
+ * Time allowed to open a connection, in milliseconds.
+ */
+const CONNECTION_TIMEOUT_MS = 5_000;
+
+/**
+ * Time allowed for one `send()` to finish, in milliseconds.
+ */
+const REQUEST_TIMEOUT_MS = 30_000;
+
+/**
  * Envelope fields `TestEventPattern` requires on every event.
  * The values do not affect matching.
  */
 const EVENT_ENVELOPE = {
   id: '00000000-0000-0000-0000-000000000000',
-  account: '123456789012',
+  account: TEST_ACCOUNT_ID,
   time: '2026-01-01T00:00:00Z',
-  region: 'us-east-1',
+  region: TEST_REGION,
   resources: [],
 };
 
-/**
- * Resolves the region the tests call EventBridge in.
- *
- * @returns Region from the environment, or {@link FALLBACK_REGION}.
- */
-const resolveRegion = (): string => {
-  return process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? FALLBACK_REGION;
-};
-
-// Throttling and transient failures are retried by the SDK (`maxAttempts`),
-// so the tests add no retry of their own.
+// The region is not set here, so the SDK resolves it from the environment.
 const client = new EventBridgeClient({
-  region: resolveRegion(),
-  maxAttempts: 3,
+  maxAttempts: MAX_ATTEMPTS,
   requestHandler: {
-    connectionTimeout: 5_000,
-    requestTimeout: 30_000,
+    connectionTimeout: CONNECTION_TIMEOUT_MS,
+    requestTimeout: REQUEST_TIMEOUT_MS,
   },
 });
 
@@ -90,70 +79,15 @@ const matchesOnEventBridge = async (
   return output.Result === true;
 };
 
-/**
- * Synthesizes the rule and reads its event pattern.
- *
- * @param props - Rule props other than `clusterArn`.
- * @returns Event pattern the construct puts in the template.
- */
-const synthesizePattern = (
-  props: Omit<EcsFargateTaskTerminationDetectionEventRuleProps, 'clusterArn'>,
-): Record<string, unknown> => {
-  const stack = new Stack(new App(), 'IntegStack', {
-    env: { account: '123456789012', region: 'us-east-1' },
-  });
-  new EcsFargateTaskTerminationDetectionEventRule(stack, 'Rule', {
-    clusterArn: CLUSTER_ARN,
-    ...props,
-  });
-
-  return readEventPattern(Template.fromStack(stack).toJSON());
+const sampleRulePatterns = {
+  default: readEventPattern(createTemplate().toJSON()),
+  service: readEventPattern(createTemplate({ serviceName: SERVICE_NAME }).toJSON()),
 };
-
-const sampleRulePatterns: Record<SampleRule, Record<string, unknown>> = {
-  default: synthesizePattern({}),
-  service: synthesizePattern({ serviceName: SERVICE_NAME }),
-};
-
-const TASK_DEFINITION_ARN = 'arn:aws:ecs:us-east-1:123456789012:task-definition/example-worker:1';
-
-const validPatternCases: Array<{
-  name: string;
-  props: Omit<EcsFargateTaskTerminationDetectionEventRuleProps, 'clusterArn'>;
-}> = [
-  { name: 'defaults', props: {} },
-  {
-    name: 'NON_ZERO_EXIT_CODE',
-    props: { detectionMode: EcsFargateTaskTerminationDetectionMode.NON_ZERO_EXIT_CODE },
-  },
-  {
-    name: 'TASK_FAILED_TO_START',
-    props: { detectionMode: EcsFargateTaskTerminationDetectionMode.TASK_FAILED_TO_START },
-  },
-  {
-    name: 'ALL_FAILURES',
-    props: { detectionMode: EcsFargateTaskTerminationDetectionMode.ALL_FAILURES },
-  },
-  { name: 'serviceName', props: { serviceName: SERVICE_NAME } },
-  { name: 'group', props: { group: 'family:example-worker' } },
-  { name: 'taskDefinitionArn', props: { taskDefinitionArn: TASK_DEFINITION_ARN } },
-  {
-    name: 'serviceName and taskDefinitionArn',
-    props: { serviceName: SERVICE_NAME, taskDefinitionArn: TASK_DEFINITION_ARN },
-  },
-  { name: 'no excluded stoppedReason prefixes', props: { excludedStoppedReasonPrefixes: [] } },
-  {
-    name: 'extended excluded stoppedReason prefixes',
-    props: {
-      excludedStoppedReasonPrefixes: [...DefaultExcludedStoppedReasonPrefixes.ALL, 'Custom reason'],
-    },
-  },
-];
 
 describe('EventBridge TestEventPattern', () => {
   describe('pattern validity', () => {
-    it.each(validPatternCases)('accepts the pattern for $name', async ({ props }) => {
-      const pattern = synthesizePattern(props);
+    it.each(RULE_PROPS_CASES)('accepts the pattern for $name', async ({ props }) => {
+      const pattern = readEventPattern(createTemplate(props).toJSON());
 
       await expect(matchesOnEventBridge(pattern, TASK_EVENT_CASES[0].event))
         .resolves.toEqual(expect.any(Boolean));

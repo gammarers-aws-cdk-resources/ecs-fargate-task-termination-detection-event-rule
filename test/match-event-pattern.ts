@@ -8,31 +8,67 @@
  * primitive makes the matcher throw.
  */
 
+/**
+ * Content filter key that matches every value except the given one.
+ */
+const ANYTHING_BUT_FILTER = 'anything-but';
+
+/**
+ * Content filter key that matches a string prefix.
+ */
+const PREFIX_FILTER = 'prefix';
+
+/**
+ * Key that matches when any one of its branches matches.
+ */
+const OR_OPERATOR = '$or';
+
+/**
+ * Keys that mark an object as a content filter instead of a nested pattern.
+ */
+const FILTER_KEYS = new Set([PREFIX_FILTER, ANYTHING_BUT_FILTER]);
+
+/**
+ * Returns whether `value` is a plain object (not `null` and not an array).
+ *
+ * @param value - Value to check.
+ * @returns `true` when `value` is a plain object.
+ */
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 };
 
-const FILTER_KEYS = new Set(['prefix', 'anything-but']);
-
+/**
+ * Returns whether `value` is a content filter such as `{ prefix: 'a' }`.
+ *
+ * @param value - Pattern object to check.
+ * @returns `true` when every key is a content filter key.
+ */
 const isFilter = (value: Record<string, unknown>): boolean => {
   const keys = Object.keys(value);
   return keys.length > 0 && keys.every((key) => FILTER_KEYS.has(key));
 };
 
-const readStringArray = (value: unknown): string[] | undefined => {
+/**
+ * Reads `value` as a list of strings.
+ *
+ * @param value - Value to read.
+ * @returns The strings, or `undefined` when `value` is not an array of strings.
+ */
+const readStringList = (value: unknown): string[] | undefined => {
   if (!Array.isArray(value)) {
     return undefined;
   }
 
-  const prefixes: string[] = [];
+  const strings: string[] = [];
   for (const item of value) {
     if (typeof item !== 'string') {
       return undefined;
     }
-    prefixes.push(item);
+    strings.push(item);
   }
 
-  return prefixes;
+  return strings;
 };
 
 /**
@@ -46,7 +82,7 @@ const readStringArray = (value: unknown): string[] | undefined => {
  * @returns `true` when the value is not excluded.
  */
 const matchesAnythingBut = (eventValue: unknown, matcher: unknown): boolean => {
-  const prefixes = isRecord(matcher) ? readStringArray(matcher.prefix) : undefined;
+  const prefixes = isRecord(matcher) ? readStringList(matcher[PREFIX_FILTER]) : undefined;
   if (prefixes) {
     return typeof eventValue === 'string' && prefixes.every((prefix) => !eventValue.startsWith(prefix));
   }
@@ -62,22 +98,32 @@ const matchesAnythingBut = (eventValue: unknown, matcher: unknown): boolean => {
  * @returns `true` when the filter matches.
  */
 const matchesFilter = (eventValue: unknown, filter: Record<string, unknown>): boolean => {
-  if ('anything-but' in filter) {
-    return matchesAnythingBut(eventValue, filter['anything-but']);
+  if (ANYTHING_BUT_FILTER in filter) {
+    return matchesAnythingBut(eventValue, filter[ANYTHING_BUT_FILTER]);
   }
 
-  return typeof filter.prefix === 'string'
+  const prefix = filter[PREFIX_FILTER];
+  return typeof prefix === 'string'
     && typeof eventValue === 'string'
-    && eventValue.startsWith(filter.prefix);
+    && eventValue.startsWith(prefix);
 };
 
+/**
+ * Returns whether the object `eventValue` satisfies every field of `pattern`,
+ * and one `$or` branch when `pattern` has one.
+ *
+ * @param eventValue - Value taken from the event. Anything but a plain object never matches.
+ * @param pattern - Object pattern, possibly with a `$or` key.
+ * @returns `true` when all fields and one `$or` branch match.
+ * @throws Error if a leaf value in `pattern` is not an array.
+ */
 const matchesObjectFields = (eventValue: unknown, pattern: Record<string, unknown>): boolean => {
   if (!isRecord(eventValue)) {
     return false;
   }
 
   const fieldsMatch = Object.entries(pattern).every(([key, fieldPattern]) => {
-    if (key === '$or') {
+    if (key === OR_OPERATOR) {
       return true;
     }
     if (!(key in eventValue)) {
@@ -89,11 +135,11 @@ const matchesObjectFields = (eventValue: unknown, pattern: Record<string, unknow
     return false;
   }
 
-  if (!('$or' in pattern)) {
+  if (!(OR_OPERATOR in pattern)) {
     return true;
   }
 
-  const branches = pattern.$or;
+  const branches = pattern[OR_OPERATOR];
   if (!Array.isArray(branches)) {
     return false;
   }
@@ -101,6 +147,15 @@ const matchesObjectFields = (eventValue: unknown, pattern: Record<string, unknow
   return branches.some((branch) => isRecord(branch) && matchesObjectFields(eventValue, branch));
 };
 
+/**
+ * Returns whether `eventValue`, or any element when it is an array, satisfies
+ * the object `pattern`.
+ *
+ * @param eventValue - Value taken from the event.
+ * @param pattern - Object pattern.
+ * @returns `true` when at least one candidate matches.
+ * @throws Error if a leaf value in `pattern` is not an array.
+ */
 const matchesObject = (eventValue: unknown, pattern: Record<string, unknown>): boolean => {
   const candidates = Array.isArray(eventValue) ? eventValue : [eventValue];
   return candidates.some((candidate) => matchesObjectFields(candidate, pattern));
@@ -185,6 +240,7 @@ export const readEventPattern = (template: unknown): Record<string, unknown> => 
  * @param event - ECS task state change event.
  * @param pattern - Synthesized EventBridge event pattern.
  * @returns `true` when the event matches.
+ * @throws Error if a leaf value in `pattern` is not an array.
  */
 export const eventMatchesPattern = (event: unknown, pattern: Record<string, unknown>): boolean => {
   return matchesObject(event, pattern);
