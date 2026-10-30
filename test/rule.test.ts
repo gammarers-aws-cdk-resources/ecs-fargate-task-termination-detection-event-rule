@@ -60,7 +60,7 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
         'source': ['aws.ecs'],
         'detail-type': ['ECS Task State Change'],
         'detail': {
-          clusterArn,
+          clusterArn: [clusterArn],
           launchType: ['FARGATE'],
           lastStatus: ['STOPPED'],
           $or: [
@@ -115,7 +115,7 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
         'source': ['aws.ecs'],
         'detail-type': ['ECS Task State Change'],
         'detail': {
-          clusterArn,
+          clusterArn: [clusterArn],
           launchType: ['FARGATE'],
           lastStatus: ['STOPPED'],
           containers: {
@@ -144,7 +144,7 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
         'source': ['aws.ecs'],
         'detail-type': ['ECS Task State Change'],
         'detail': {
-          clusterArn,
+          clusterArn: [clusterArn],
           launchType: ['FARGATE'],
           lastStatus: ['STOPPED'],
           $or: [
@@ -176,7 +176,7 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
         'source': ['aws.ecs'],
         'detail-type': ['ECS Task State Change'],
         'detail': {
-          clusterArn,
+          clusterArn: [clusterArn],
           launchType: ['FARGATE'],
           lastStatus: ['STOPPED'],
           $or: [
@@ -223,7 +223,7 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
         'source': ['aws.ecs'],
         'detail-type': ['ECS Task State Change'],
         'detail': {
-          clusterArn,
+          clusterArn: [clusterArn],
           launchType: ['FARGATE'],
           lastStatus: ['STOPPED'],
           $or: [
@@ -275,7 +275,7 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
         'source': ['aws.ecs'],
         'detail-type': ['ECS Task State Change'],
         'detail': {
-          clusterArn,
+          clusterArn: [clusterArn],
           launchType: ['FARGATE'],
           lastStatus: ['STOPPED'],
           containers: {
@@ -301,7 +301,7 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
         'source': ['aws.ecs'],
         'detail-type': ['ECS Task State Change'],
         'detail': {
-          clusterArn,
+          clusterArn: [clusterArn],
           launchType: ['FARGATE'],
           group: ['service:example-api'],
           lastStatus: ['STOPPED'],
@@ -344,7 +344,7 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
         'source': ['aws.ecs'],
         'detail-type': ['ECS Task State Change'],
         'detail': {
-          clusterArn,
+          clusterArn: [clusterArn],
           launchType: ['FARGATE'],
           group: ['family:example-worker'],
           lastStatus: ['STOPPED'],
@@ -388,7 +388,7 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
         'source': ['aws.ecs'],
         'detail-type': ['ECS Task State Change'],
         'detail': {
-          clusterArn,
+          clusterArn: [clusterArn],
           launchType: ['FARGATE'],
           taskDefinitionArn: [taskDefinitionArn],
           lastStatus: ['STOPPED'],
@@ -433,7 +433,7 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
         'source': ['aws.ecs'],
         'detail-type': ['ECS Task State Change'],
         'detail': {
-          clusterArn,
+          clusterArn: [clusterArn],
           launchType: ['FARGATE'],
           group: ['service:example-api'],
           taskDefinitionArn: [taskDefinitionArn],
@@ -543,7 +543,7 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
     Template.fromStack(emptyClusterStack).hasResourceProperties('AWS::Events::Rule', {
       EventPattern: Match.objectLike({
         detail: {
-          clusterArn: '',
+          clusterArn: [''],
         },
       }),
     });
@@ -559,7 +559,7 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
     Template.fromStack(invalidClusterStack).hasResourceProperties('AWS::Events::Rule', {
       EventPattern: Match.objectLike({
         detail: {
-          clusterArn: 'not-an-arn',
+          clusterArn: ['not-an-arn'],
         },
       }),
     });
@@ -596,7 +596,7 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
         'source': ['aws.ecs'],
         'detail-type': ['ECS Task State Change'],
         'detail': {
-          clusterArn,
+          clusterArn: [clusterArn],
           launchType: ['FARGATE'],
           group: ['service:example-api'],
           lastStatus: ['STOPPED'],
@@ -643,7 +643,7 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
         'source': ['aws.ecs'],
         'detail-type': ['ECS Task State Change'],
         'detail': {
-          clusterArn,
+          clusterArn: [clusterArn],
           launchType: ['FARGATE'],
           group: ['family:example-worker'],
           taskDefinitionArn: [taskDefinitionArn],
@@ -688,7 +688,7 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
         'source': ['aws.ecs'],
         'detail-type': ['ECS Task State Change'],
         'detail': {
-          clusterArn,
+          clusterArn: [clusterArn],
           launchType: ['FARGATE'],
           group: ['service:example-api'],
           lastStatus: ['STOPPED'],

@@ -251,7 +251,7 @@ const buildScopeDetail = (
   const taskDefinitionArn = resolveTaskDefinitionArn(scope.taskDefinitionArn);
 
   return {
-    clusterArn,
+    clusterArn: [clusterArn],
     launchType: [LaunchType.FARGATE],
     ...(taskGroup === undefined ? {} : { group: [taskGroup] }),
     ...(taskDefinitionArn === undefined ? {} : { taskDefinitionArn: [taskDefinitionArn] }),

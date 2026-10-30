@@ -41,6 +41,24 @@ describe('event pattern matching guards', () => {
     expect(matched).toBe(false);
   });
 
+  it('throws when a pattern leaf value is not an array', () => {
+    expect(() => {
+      eventMatchesPattern({ source: 'aws.ecs' }, { source: 'aws.ecs' });
+    }).toThrow('Event pattern leaf values must be arrays.');
+  });
+
+  it('throws when a nested object pattern has a non-array leaf value', () => {
+    expect(() => {
+      eventMatchesPattern({ detail: { clusterArn: 'arn' } }, { detail: { clusterArn: 'arn' } });
+    }).toThrow('Event pattern leaf values must be arrays.');
+  });
+
+  it('throws when a pattern array contains a nested array', () => {
+    expect(() => {
+      eventMatchesPattern({ source: 'aws.ecs' }, { source: [['aws.ecs']] });
+    }).toThrow('Event pattern must not contain a nested array.');
+  });
+
   it('throws when the template has no resources', () => {
     expect(() => readEventPattern({})).toThrow('Expected a CloudFormation template.');
   });

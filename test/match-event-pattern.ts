@@ -3,6 +3,9 @@
  *
  * Covers exact values, arrays (any element), `prefix`, `anything-but`,
  * `anything-but` prefix lists, nested objects, and one `$or`.
+ *
+ * Like EventBridge, every leaf value in the pattern must be an array. A bare
+ * primitive makes the matcher throw.
  */
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
@@ -103,20 +106,54 @@ const matchesObject = (eventValue: unknown, pattern: Record<string, unknown>): b
   return candidates.some((candidate) => matchesObjectFields(candidate, pattern));
 };
 
-const matchesValue = (eventValue: unknown, pattern: unknown): boolean => {
-  if (Array.isArray(pattern)) {
-    return pattern.some((item) => matchesValue(eventValue, item));
+/**
+ * Returns whether `eventValue` satisfies one element of a pattern array.
+ *
+ * An element is an exact primitive value, a content filter, or (for nested
+ * event fields) an object pattern. A nested array is not valid in EventBridge.
+ *
+ * @param eventValue - Value taken from the event.
+ * @param item - One element of a pattern array.
+ * @returns `true` when the element matches.
+ * @throws Error if `item` is an array.
+ */
+const matchesArrayItem = (eventValue: unknown, item: unknown): boolean => {
+  if (Array.isArray(item)) {
+    throw new Error('Event pattern must not contain a nested array.');
   }
 
-  if (isRecord(pattern) && isFilter(pattern)) {
-    return matchesFilter(eventValue, pattern);
+  if (isRecord(item) && isFilter(item)) {
+    return matchesFilter(eventValue, item);
+  }
+
+  if (isRecord(item)) {
+    return matchesObject(eventValue, item);
+  }
+
+  return eventValue === item;
+};
+
+/**
+ * Returns whether `eventValue` satisfies a pattern value.
+ *
+ * EventBridge requires every leaf value to be an array, so a bare primitive is
+ * rejected instead of being compared.
+ *
+ * @param eventValue - Value taken from the event.
+ * @param pattern - Pattern value for the field.
+ * @returns `true` when the value matches.
+ * @throws Error if `pattern` is a leaf value that is not an array.
+ */
+const matchesValue = (eventValue: unknown, pattern: unknown): boolean => {
+  if (Array.isArray(pattern)) {
+    return pattern.some((item) => matchesArrayItem(eventValue, item));
   }
 
   if (isRecord(pattern)) {
     return matchesObject(eventValue, pattern);
   }
 
-  return eventValue === pattern;
+  throw new Error('Event pattern leaf values must be arrays.');
 };
 
 /**
