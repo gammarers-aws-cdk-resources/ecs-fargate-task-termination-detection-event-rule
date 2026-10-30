@@ -37,7 +37,7 @@
     "organization": false
   },
   "devDependencies": {
-    "@aws-sdk/client-eventbridge": "^3",
+    "@aws-sdk/client-eventbridge": "^3.1160.0",
     "@gammarers/projen-projects": "^0.5.1",
     "@stylistic/eslint-plugin": "^2",
     "@types/jest": "^29.5.14",

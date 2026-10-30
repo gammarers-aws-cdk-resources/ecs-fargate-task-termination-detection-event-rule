@@ -2,7 +2,7 @@
   "dependencies": [
     {
       "name": "@aws-sdk/client-eventbridge",
-      "version": "^3",
+      "version": "^3.1160.0",
       "type": "build"
     },
     {
