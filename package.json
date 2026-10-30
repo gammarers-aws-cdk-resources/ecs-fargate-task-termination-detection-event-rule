@@ -38,7 +38,7 @@
   },
   "devDependencies": {
     "@aws-sdk/client-eventbridge": "^3.1160.0",
-    "@gammarers/projen-projects": "^0.5.1",
+    "@gammarers/projen-projects": "^0.6.2",
     "@stylistic/eslint-plugin": "^2",
     "@types/jest": "^29.5.14",
     "@types/node": "^20",
@@ -93,6 +93,14 @@
   "version": "0.0.0",
   "jest": {
     "coverageProvider": "v8",
+    "coverageThreshold": {
+      "global": {
+        "branches": 95,
+        "functions": 90,
+        "lines": 100,
+        "statements": 100
+      }
+    },
     "testMatch": [
       "<rootDir>/@(src|test)/**/*(*.)@(spec|test).ts?(x)",
       "<rootDir>/@(src|test)/**/__tests__/**/*.ts?(x)",
