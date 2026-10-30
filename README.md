@@ -82,7 +82,9 @@ pnpm add ecs-fargate-task-termination-detection-event-rule
 
 ## Usage
 
-Send unexpected task-termination events to an SNS topic:
+### Minimal deployable app
+
+Add the rule to a stack and send unexpected task-termination events to an SNS topic. This is a complete CDK app entry you can deploy as-is.
 
 ```typescript
 import { App, Stack } from 'aws-cdk-lib';
@@ -91,7 +93,13 @@ import { Topic } from 'aws-cdk-lib/aws-sns';
 import { EcsFargateTaskTerminationDetectionEventRule } from 'ecs-fargate-task-termination-detection-event-rule';
 
 const app = new App();
-const stack = new Stack(app, 'ExampleStack');
+
+const stack = new Stack(app, 'ExampleStack', {
+  env: {
+    account: process.env.CDK_DEFAULT_ACCOUNT,
+    region: process.env.CDK_DEFAULT_REGION,
+  },
+});
 
 const clusterArn = 'arn:aws:ecs:us-east-1:123456789012:cluster/example-app-cluster';
 const alertTopic = new Topic(stack, 'TaskFailureAlertTopic');
@@ -101,11 +109,19 @@ const rule = new EcsFargateTaskTerminationDetectionEventRule(stack, 'EcsFargateT
   clusterArn,
 });
 rule.addTarget(new SnsTopic(alertTopic));
+
+app.synth();
 ```
+
+Deploy checklist:
+
+1. Install this package and its peers (`aws-cdk-lib`, `constructs`) in your CDK app.
+2. Replace `clusterArn` with the ARN of your cluster. Deploy the stack to the same account and Region as that cluster, because ECS events are delivered in the Region where the tasks run.
+3. From the CDK app, run `npx cdk deploy ExampleStack`.
 
 You can also pass `targets` in the constructor (`RuleProps`) instead of calling `addTarget`.
 
-Common customizations:
+### Common customizations
 
 ```typescript
 import {
@@ -152,11 +168,11 @@ const extendedExclusionsRule = new EcsFargateTaskTerminationDetectionEventRule(s
 | Property | Required | Default | Description |
 | --- | --- | --- | --- |
 | `clusterArn` | Yes | | ARN of the ECS cluster to monitor. Matching is always limited to `launchType` `FARGATE` in that cluster. |
-| `serviceName` | No | | ECS service name. Matched as `detail.group` = `service:${serviceName}`. Do not include the `service:` prefix. Cannot be set together with `group`. |
-| `group` | No | | Raw ECS task group, matched exactly against `detail.group`. Use this for a non-service group. Cannot be set together with `serviceName`. |
-| `taskDefinitionArn` | No | | Task definition ARN, matched exactly against `detail.taskDefinitionArn`, including the revision when the event has one. |
+| `serviceName` | No | | ECS service name. Matched as `detail.group` = `service:${serviceName}`. Do not include the `service:` prefix. Must not be empty. Cannot be set together with `group`. |
+| `group` | No | | Raw ECS task group, matched exactly against `detail.group`. Use this for a non-service group. Must not be empty. Cannot be set together with `serviceName`. |
+| `taskDefinitionArn` | No | | Task definition ARN, matched exactly against `detail.taskDefinitionArn`, including the revision when the event has one. Must not be empty. |
 | `detectionMode` | No | `EcsFargateTaskTerminationDetectionMode.ALL_FAILURES` | `ALL_FAILURES` matches a non-zero `exitCode` or a startup or pull failure. `NON_ZERO_EXIT_CODE` matches only non-zero container exit codes. `TASK_FAILED_TO_START` matches only startup or pull failures. |
-| `excludedStoppedReasonPrefixes` | No | `DefaultExcludedStoppedReasonPrefixes.ALL` | `stoppedReason` prefixes excluded from non-zero exit-code matching. Pass a new array to replace the default set, spread `DefaultExcludedStoppedReasonPrefixes.ALL` to extend it, or pass `[]` to disable exclusion. Applies only to the non-zero `exitCode` branch. |
+| `excludedStoppedReasonPrefixes` | No | `DefaultExcludedStoppedReasonPrefixes.ALL` | `stoppedReason` prefixes excluded from non-zero exit-code matching. Pass a new array to replace the default set, spread `DefaultExcludedStoppedReasonPrefixes.ALL` to extend it, or pass `[]` to disable exclusion. Must not contain empty strings. Applies only to the non-zero `exitCode` branch. |
 | Other `RuleProps` | No | | For example `description`, `enabled`, `ruleName`, and `targets`. |
 | `eventPattern` | | | Not supported. The construct always defines its own `eventPattern` and throws if one is provided. |
 
@@ -169,23 +185,6 @@ See [API.md](API.md).
 - Node.js `>= 20.0.0`
 - AWS CDK `aws-cdk-lib` `^2.232.0`
 - `constructs` `^10.5.1`
-
-## Notes
-
-### Integration tests
-
-`npx projen test` checks the event pattern with a local matcher only. To check it against the real Amazon EventBridge, run:
-
-```bash
-npx projen integ
-```
-
-The tests send the synthesized patterns and sample ECS events to the [`TestEventPattern`](https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_TestEventPattern.html) API. EventBridge validates each pattern and reports whether an event matches it. They also check that the local matcher agrees with EventBridge.
-
-- No rule or other resource is created, so nothing needs cleanup.
-- AWS credentials are required, and they only need the `events:TestEventPattern` permission.
-- The region is resolved by the AWS SDK from `AWS_REGION`, `AWS_DEFAULT_REGION`, or the shared AWS config file. The tests fail if none is set.
-- They are excluded from `npx projen test` and from the pull request build, which have no AWS credentials.
 
 ## License
 
