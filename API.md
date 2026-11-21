@@ -619,6 +619,8 @@ ARN of one ECS cluster to monitor.
 
 Set this, {@link EcsFargateTaskTerminationDetectionEventRuleProps.cluster},
 or {@link EcsFargateTaskTerminationDetectionEventRuleProps.clusterArns}.
+When {@link EcsFargateTaskTerminationDetectionEventRuleProps.service} is set
+and none of those are set, the service's cluster is used.
 The value is placed in the pattern as given, including a CloudFormation token.
 An empty string is kept as given.
 
@@ -634,9 +636,12 @@ public readonly clusterArns: string[];
 
 ARNs of the ECS clusters to monitor.
 
-Each ARN is an alternative match. The list must contain at least one ARN.
+Each ARN is an alternative match. The list must contain at least one ARN
+and must not contain an empty string.
 Set this, {@link EcsFargateTaskTerminationDetectionEventRuleProps.cluster},
 or {@link EcsFargateTaskTerminationDetectionEventRuleProps.clusterArn}.
+When {@link EcsFargateTaskTerminationDetectionEventRuleProps.service} is set
+and none of those are set, the service's cluster is used.
 
 ---
 
@@ -653,7 +658,7 @@ Container names to monitor.
 The rule matches when one of these containers satisfies the failure
 condition. Other containers in the task are ignored. Applies to both the
 non-zero exit branch and the startup-failure branch. Omit to match any
-container.
+container. The list must not be empty or contain an empty string.
 
 ---
 
@@ -731,6 +736,7 @@ Raw ECS task group used to narrow matching.
 
 Matched exactly against `detail.group`. Use this for a non-service task
 group. For an ECS service, use `serviceName`, `serviceNames`, or `service`.
+Must not be empty.
 
 Cannot be set together with `serviceName`, `serviceNames`, or `service`.
 
@@ -750,6 +756,7 @@ Container exit codes to ignore, in addition to the successful code `0`.
 Applies only to non-zero exit matching. For example, `143` drops SIGTERM
 exits that are not already excluded by `stopCode` or `stoppedReason`.
 Startup-failure matching is unchanged. `0` is always ignored.
+Values must be integers. Duplicates are dropped.
 
 ---
 
@@ -767,6 +774,7 @@ The rule matches `detail.group` equal to `service:${service.serviceName}`.
 When `cluster`, `clusterArn`, and `clusterArns` are all omitted, it also
 uses `service.cluster`. When a cluster input is set as well, that input
 selects the cluster and this property only selects the service name.
+`service.serviceName` must not be empty.
 
 Cannot be set together with `serviceName`, `serviceNames`, or `group`.
 
@@ -784,7 +792,7 @@ ECS service name used to narrow matching to one service.
 
 Matched as `detail.group` equal to `service:${serviceName}`. Omit to
 match every Fargate task in the selected clusters. Pass the service name
-only, without the `service:` prefix.
+only, without the `service:` prefix. Must not be empty.
 
 Cannot be set together with `serviceNames`, `service`, or `group`.
 
@@ -802,6 +810,7 @@ ECS service names used to narrow matching to those services.
 
 Each name is matched as `detail.group` equal to `service:${name}`. Any
 listed service matches. Pass service names only, without the `service:` prefix.
+The list must not be empty or contain an empty string.
 
 Cannot be set together with `serviceName`, `service`, or `group`.
 
@@ -843,6 +852,7 @@ Task definition ARN used to narrow matching.
 Matched exactly against `detail.taskDefinitionArn`. Include the revision
 when events carry one
 (`arn:aws:ecs:region:account:task-definition/family:revision`).
+Must not be empty.
 
 ---
 
