@@ -8,7 +8,7 @@ const project = new ProjenCdkConstructLibrary({
   npmTrustedPublishing: true,
   repositoryUrl: 'https://github.com/gammarers-aws-cdk-resources/ecs-fargate-task-termination-detection-event-rule.git',
   devDeps: [
-    '@gammarers/projen-projects@^0.6.2',
+    '@gammarers/projen-projects@^0.8.1',
     '@aws-sdk/client-eventbridge@^3.1160.0',
   ],
 });
@@ -29,6 +29,4 @@ project.addTask('integ', {
   ].join(' '),
   receiveArgs: true,
 });
-
-project.addPackageIgnore('/.devcontainer');
 project.synth();
