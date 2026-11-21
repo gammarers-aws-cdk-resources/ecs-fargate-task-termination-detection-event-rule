@@ -2,12 +2,7 @@
  * ECS task state change events shared by the unit tests and the integration
  * tests, so both check the same cases.
  */
-import { CLUSTER_ARN, SERVICE_NAME, TEST_ACCOUNT_ID, TEST_REGION } from './constants';
-
-/**
- * Cluster other than {@link CLUSTER_ARN}, used to check the cluster scope.
- */
-const OTHER_CLUSTER_ARN = `arn:aws:ecs:${TEST_REGION}:${TEST_ACCOUNT_ID}:cluster/other`;
+import { CLUSTER_ARN, OTHER_CLUSTER_ARN, SERVICE_NAME } from './constants';
 
 /**
  * Sample rule an event is checked against.

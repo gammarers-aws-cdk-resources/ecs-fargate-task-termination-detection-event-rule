@@ -19,9 +19,9 @@ when `stopCode` is `ServiceSchedulerInitiated`. Events that omit `stopCode`
 use {@link DefaultExcludedStoppedReasonPrefixes.ALL}.
 
 This rule defines its own `eventPattern` and does not accept `props.eventPattern`.
-The pattern is scoped to the given `clusterArn` and to `launchType` `FARGATE`.
-Optional `serviceName`, `group`, and `taskDefinitionArn` narrow that scope
-further.
+The pattern is scoped to the selected clusters and to `launchType` `FARGATE`.
+Optional `serviceName`, `serviceNames`, `service`, `group`, and
+`taskDefinitionArn` narrow that scope further.
 
 #### Initializers <a name="Initializers" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRule.Initializer"></a>
 
@@ -35,7 +35,7 @@ new EcsFargateTaskTerminationDetectionEventRule(scope: Construct, id: string, pr
 | --- | --- | --- |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRule.Initializer.parameter.scope">scope</a></code> | <code>constructs.Construct</code> | - Parent construct. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRule.Initializer.parameter.id">id</a></code> | <code>string</code> | - Construct identifier. |
-| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRule.Initializer.parameter.props">props</a></code> | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps">EcsFargateTaskTerminationDetectionEventRuleProps</a></code> | - Rule properties including required `clusterArn`. |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRule.Initializer.parameter.props">props</a></code> | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps">EcsFargateTaskTerminationDetectionEventRuleProps</a></code> | - Rule properties. |
 
 ---
 
@@ -59,7 +59,9 @@ Construct identifier.
 
 - *Type:* <a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps">EcsFargateTaskTerminationDetectionEventRuleProps</a>
 
-Rule properties including required `clusterArn`.
+Rule properties.
+
+Set `cluster`, `clusterArn`, `clusterArns`, or `service`.
 
 ---
 
@@ -426,12 +428,16 @@ const ecsFargateTaskTerminationDetectionEventRuleProps: EcsFargateTaskTerminatio
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.role">role</a></code> | <code>aws-cdk-lib.interfaces.aws_iam.IRoleRef</code> | The role that is used for target invocation. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.schedule">schedule</a></code> | <code>aws-cdk-lib.aws_events.Schedule</code> | The schedule or rate (frequency) that determines when EventBridge runs the rule. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.targets">targets</a></code> | <code>aws-cdk-lib.aws_events.IRuleTarget[]</code> | Targets to invoke when this rule matches an event. |
-| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.clusterArn">clusterArn</a></code> | <code>string</code> | ARN of the ECS cluster to monitor. |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.cluster">cluster</a></code> | <code>aws-cdk-lib.aws_ecs.ICluster</code> | ECS cluster to monitor. |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.clusterArn">clusterArn</a></code> | <code>string</code> | ARN of one ECS cluster to monitor. |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.clusterArns">clusterArns</a></code> | <code>string[]</code> | ARNs of the ECS clusters to monitor. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.detectionMode">detectionMode</a></code> | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode">EcsFargateTaskTerminationDetectionMode</a></code> | How task failures are matched in the EventBridge event pattern. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.excludedStopCodes">excludedStopCodes</a></code> | <code>string[]</code> | `stopCode` values excluded from non-zero exit-code matching. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.excludedStoppedReasonPrefixes">excludedStoppedReasonPrefixes</a></code> | <code>string[]</code> | `stoppedReason` prefixes excluded from non-zero exit-code matching via EventBridge `anything-but` prefix matching. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.group">group</a></code> | <code>string</code> | Raw ECS task group used to narrow matching. |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.service">service</a></code> | <code>aws-cdk-lib.aws_ecs.IBaseService</code> | ECS service to monitor. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.serviceName">serviceName</a></code> | <code>string</code> | ECS service name used to narrow matching to one service. |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.serviceNames">serviceNames</a></code> | <code>string[]</code> | ECS service names used to narrow matching to those services. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.startupFailureStoppedReasonPrefixes">startupFailureStoppedReasonPrefixes</a></code> | <code>string[]</code> | `stoppedReason` prefixes that match a startup failure when the event has no `stopCode`. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.taskDefinitionArn">taskDefinitionArn</a></code> | <code>string</code> | Task definition ARN used to narrow matching. |
 
@@ -574,7 +580,31 @@ target input, use `addTarget(target[, inputOptions])`.
 
 ---
 
-##### `clusterArn`<sup>Required</sup> <a name="clusterArn" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.clusterArn"></a>
+##### `cluster`<sup>Optional</sup> <a name="cluster" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.cluster"></a>
+
+```typescript
+public readonly cluster: ICluster;
+```
+
+- *Type:* aws-cdk-lib.aws_ecs.ICluster
+
+ECS cluster to monitor.
+
+The rule uses `cluster.clusterArn`. A cluster created in the same stack
+stays a CloudFormation token until deploy.
+
+Set this, {@link EcsFargateTaskTerminationDetectionEventRuleProps.clusterArn},
+or {@link EcsFargateTaskTerminationDetectionEventRuleProps.clusterArns}.
+When {@link EcsFargateTaskTerminationDetectionEventRuleProps.service} is set
+and none of those are set, the service's cluster is used.
+
+The rule matches only tasks whose `launchType` is `FARGATE`. EC2 and
+EXTERNAL tasks in the same cluster are ignored. Fargate Spot tasks stay in
+scope because their `launchType` remains `FARGATE`.
+
+---
+
+##### `clusterArn`<sup>Optional</sup> <a name="clusterArn" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.clusterArn"></a>
 
 ```typescript
 public readonly clusterArn: string;
@@ -582,12 +612,28 @@ public readonly clusterArn: string;
 
 - *Type:* string
 
-ARN of the ECS cluster to monitor.
+ARN of one ECS cluster to monitor.
 
-The rule matches only tasks in this cluster whose `launchType` is
-`FARGATE`. EC2 and EXTERNAL tasks in the same cluster are ignored.
-Fargate Spot tasks stay in scope because their `launchType` remains
-`FARGATE` (`capacityProviderName` is `FARGATE_SPOT`).
+Set this, {@link EcsFargateTaskTerminationDetectionEventRuleProps.cluster},
+or {@link EcsFargateTaskTerminationDetectionEventRuleProps.clusterArns}.
+The value is placed in the pattern as given, including a CloudFormation token.
+An empty string is kept as given.
+
+---
+
+##### `clusterArns`<sup>Optional</sup> <a name="clusterArns" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.clusterArns"></a>
+
+```typescript
+public readonly clusterArns: string[];
+```
+
+- *Type:* string[]
+
+ARNs of the ECS clusters to monitor.
+
+Each ARN is an alternative match. The list must contain at least one ARN.
+Set this, {@link EcsFargateTaskTerminationDetectionEventRuleProps.cluster},
+or {@link EcsFargateTaskTerminationDetectionEventRuleProps.clusterArn}.
 
 ---
 
@@ -662,10 +708,28 @@ public readonly group: string;
 Raw ECS task group used to narrow matching.
 
 Matched exactly against `detail.group`. Use this for a non-service task
-group. For an ECS service, use
-{@link EcsFargateTaskTerminationDetectionEventRuleProps.serviceName}.
+group. For an ECS service, use `serviceName`, `serviceNames`, or `service`.
 
-Cannot be set together with {@link EcsFargateTaskTerminationDetectionEventRuleProps.serviceName}.
+Cannot be set together with `serviceName`, `serviceNames`, or `service`.
+
+---
+
+##### `service`<sup>Optional</sup> <a name="service" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.service"></a>
+
+```typescript
+public readonly service: IBaseService;
+```
+
+- *Type:* aws-cdk-lib.aws_ecs.IBaseService
+
+ECS service to monitor.
+
+The rule matches `detail.group` equal to `service:${service.serviceName}`.
+When `cluster`, `clusterArn`, and `clusterArns` are all omitted, it also
+uses `service.cluster`. When a cluster input is set as well, that input
+selects the cluster and this property only selects the service name.
+
+Cannot be set together with `serviceName`, `serviceNames`, or `group`.
 
 ---
 
@@ -680,10 +744,27 @@ public readonly serviceName: string;
 ECS service name used to narrow matching to one service.
 
 Matched as `detail.group` equal to `service:${serviceName}`. Omit to
-match every Fargate task in the cluster. Pass the service name only,
-without the `service:` prefix.
+match every Fargate task in the selected clusters. Pass the service name
+only, without the `service:` prefix.
 
-Cannot be set together with {@link EcsFargateTaskTerminationDetectionEventRuleProps.group}.
+Cannot be set together with `serviceNames`, `service`, or `group`.
+
+---
+
+##### `serviceNames`<sup>Optional</sup> <a name="serviceNames" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.serviceNames"></a>
+
+```typescript
+public readonly serviceNames: string[];
+```
+
+- *Type:* string[]
+
+ECS service names used to narrow matching to those services.
+
+Each name is matched as `detail.group` equal to `service:${name}`. Any
+listed service matches. Pass service names only, without the `service:` prefix.
+
+Cannot be set together with `serviceName`, `service`, or `group`.
 
 ---
 

@@ -1,4 +1,13 @@
 import { Match, Template } from 'aws-cdk-lib/assertions';
+import { SubnetType, Vpc } from 'aws-cdk-lib/aws-ec2';
+import {
+  Cluster,
+  ContainerImage,
+  FargateService,
+  FargateTaskDefinition,
+  type IBaseService,
+  type ICluster,
+} from 'aws-cdk-lib/aws-ecs';
 import * as events from 'aws-cdk-lib/aws-events';
 import {
   DefaultExcludedStopCodes,
@@ -8,7 +17,7 @@ import {
   EcsFargateTaskTerminationDetectionMode,
   EcsTaskStopCode,
 } from '../src';
-import { CLUSTER_ARN, SERVICE_NAME, TASK_DEFINITION_ARN, TASK_GROUP } from './fixtures/constants';
+import { CLUSTER_ARN, OTHER_CLUSTER_ARN, SERVICE_NAME, TASK_DEFINITION_ARN, TASK_GROUP } from './fixtures/constants';
 import { RULE_PROPS_CASES } from './fixtures/rule-props';
 import { createStack, createTemplate } from './fixtures/synthesize';
 import { TASK_EVENT_CASES } from './fixtures/task-events';
@@ -112,6 +121,37 @@ const ALL_FAILURES_DETAIL = {
 };
 
 /**
+ * Builds a service double that exposes only the fields this construct reads.
+ *
+ * @param clusterArn - Cluster ARN the service reports.
+ * @param serviceName - Service name the service reports.
+ * @returns A partial service cast to the construct's input type.
+ */
+const serviceDouble = (clusterArn: string, serviceName: string): IBaseService => {
+  return {
+    serviceName,
+    cluster: { clusterArn },
+  } as IBaseService;
+};
+
+/**
+ * Reads `detail` from the one Events rule in `template`.
+ *
+ * @param template - Template with one Events rule.
+ * @returns The rule's `detail` pattern, including CloudFormation intrinsics.
+ * @throws Error when the template has no event detail.
+ */
+const readDetail = (template: Template): Record<string, unknown> => {
+  const pattern = readEventPattern(template.toJSON());
+  const detail = pattern.detail;
+  if (typeof detail !== 'object' || detail === null || Array.isArray(detail)) {
+    throw new Error('Expected event detail.');
+  }
+
+  return detail as Record<string, unknown>;
+};
+
+/**
  * Asserts the rule's event pattern is exactly the fixed ECS scope plus `detail`.
  *
  * The scope is `aws.ecs` / `ECS Task State Change`, the sample cluster,
@@ -119,14 +159,19 @@ const ALL_FAILURES_DETAIL = {
  *
  * @param template - Template with one Events rule.
  * @param detail - Expected `detail` fields beyond the fixed scope.
+ * @param clusterArns - Cluster ARNs in the pattern. Defaults to the sample cluster.
  */
-const expectEventPattern = (template: Template, detail: Record<string, unknown>): void => {
+const expectEventPattern = (
+  template: Template,
+  detail: Record<string, unknown>,
+  clusterArns: string[] = [CLUSTER_ARN],
+): void => {
   template.hasResourceProperties('AWS::Events::Rule', {
     EventPattern: Match.objectEquals({
       'source': ['aws.ecs'],
       'detail-type': ['ECS Task State Change'],
       'detail': {
-        clusterArn: [CLUSTER_ARN],
+        clusterArn: clusterArns,
         launchType: ['FARGATE'],
         lastStatus: ['STOPPED'],
         ...detail,
@@ -289,12 +334,15 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
       expectEventPattern(createTemplate(props), detail);
     });
 
-    it('should throw when serviceName and group are both set', () => {
+    it.each([
+      { serviceName: SERVICE_NAME, group: TASK_GROUP },
+      { serviceName: SERVICE_NAME, serviceNames: [SERVICE_NAME] },
+      { serviceNames: [SERVICE_NAME], group: TASK_GROUP },
+      { service: serviceDouble(CLUSTER_ARN, SERVICE_NAME), serviceName: SERVICE_NAME },
+    ])('should throw when more than one service selector is set', (props) => {
       expect(() => {
-        createTemplate({ serviceName: SERVICE_NAME, group: SERVICE_GROUP });
-      }).toThrow(
-        'serviceName and group cannot both be set. Use serviceName for an ECS service, or group for a raw task group.',
-      );
+        createTemplate(props);
+      }).toThrow('Set only one of serviceName, serviceNames, service, or group.');
     });
 
     it.each([
@@ -425,6 +473,138 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
       createTemplate(props).hasResourceProperties('AWS::Events::Rule', {
         EventPattern: Match.objectLike({ detail }),
       });
+    });
+  });
+
+  describe('cluster selection', () => {
+    it('should match every ARN in clusterArns', () => {
+      expectEventPattern(
+        createTemplate({ clusterArns: [CLUSTER_ARN, OTHER_CLUSTER_ARN] }),
+        ALL_FAILURES_DETAIL,
+        [CLUSTER_ARN, OTHER_CLUSTER_ARN],
+      );
+    });
+
+    it('should keep a cluster created in the same stack as a token', () => {
+      const stack = createStack();
+      const vpc = Vpc.fromVpcAttributes(stack, 'Vpc', {
+        vpcId: 'vpc-0123456789abcdef0',
+        availabilityZones: ['us-east-1a', 'us-east-1b'],
+        publicSubnetIds: ['subnet-11111111', 'subnet-22222222'],
+      });
+      const cluster = new Cluster(stack, 'Cluster', { vpc });
+      new EcsFargateTaskTerminationDetectionEventRule(stack, 'Rule', { cluster });
+
+      const detail = readDetail(Template.fromStack(stack));
+      expect(detail.clusterArn).toEqual([
+        { 'Fn::GetAtt': [expect.any(String), 'Arn'] },
+      ]);
+    });
+
+    it('should use the service cluster when no cluster prop is set', () => {
+      const service = serviceDouble(CLUSTER_ARN, SERVICE_NAME);
+      expectEventPattern(createTemplate({ service }), {
+        group: [SERVICE_GROUP],
+        ...ALL_FAILURES_DETAIL,
+      });
+    });
+
+    it('should keep an explicit cluster when service is also set', () => {
+      const service = serviceDouble(OTHER_CLUSTER_ARN, SERVICE_NAME);
+      expectEventPattern(createTemplate({ clusterArn: CLUSTER_ARN, service }), {
+        group: [SERVICE_GROUP],
+        ...ALL_FAILURES_DETAIL,
+      });
+    });
+
+    it('should throw when no cluster source is set', () => {
+      expect(() => {
+        new EcsFargateTaskTerminationDetectionEventRule(createStack(), 'Rule', {});
+      }).toThrow('Set cluster, clusterArn, clusterArns, or service.');
+    });
+
+    it.each([
+      { cluster: { clusterArn: CLUSTER_ARN } as ICluster, clusterArn: CLUSTER_ARN },
+      { clusterArn: CLUSTER_ARN, clusterArns: [CLUSTER_ARN] },
+      { cluster: { clusterArn: CLUSTER_ARN } as ICluster, clusterArns: [CLUSTER_ARN] },
+    ])('should throw when more than one cluster source is set', (props) => {
+      expect(() => {
+        new EcsFargateTaskTerminationDetectionEventRule(createStack(), 'Rule', props);
+      }).toThrow('Set only one of cluster, clusterArn, or clusterArns.');
+    });
+
+    it.each([
+      { clusterArns: [] },
+      { clusterArns: [''] },
+      { clusterArns: [CLUSTER_ARN, ''] },
+    ])('should throw when clusterArns is empty', (props) => {
+      expect(() => {
+        createTemplate(props);
+      }).toThrow(/clusterArns must not be empty|clusterArns must not contain empty strings/);
+    });
+  });
+
+  describe('service selection', () => {
+    it('should match every name in serviceNames', () => {
+      expectEventPattern(createTemplate({ serviceNames: [SERVICE_NAME, 'example-worker'] }), {
+        group: [SERVICE_GROUP, 'service:example-worker'],
+        ...ALL_FAILURES_DETAIL,
+      });
+    });
+
+    it('should keep a service created in the same stack as a token', () => {
+      const stack = createStack();
+      const vpc = Vpc.fromVpcAttributes(stack, 'Vpc', {
+        vpcId: 'vpc-0123456789abcdef0',
+        availabilityZones: ['us-east-1a', 'us-east-1b'],
+        publicSubnetIds: ['subnet-11111111', 'subnet-22222222'],
+      });
+      const cluster = new Cluster(stack, 'Cluster', { vpc });
+      const taskDefinition = new FargateTaskDefinition(stack, 'TaskDefinition');
+      taskDefinition.addContainer('app', {
+        image: ContainerImage.fromRegistry('public.ecr.aws/docker/library/busybox:stable'),
+      });
+      const service = new FargateService(stack, 'Service', {
+        cluster,
+        taskDefinition,
+        assignPublicIp: true,
+        vpcSubnets: { subnetType: SubnetType.PUBLIC },
+      });
+      new EcsFargateTaskTerminationDetectionEventRule(stack, 'Rule', { service });
+
+      const detail = readDetail(Template.fromStack(stack));
+      expect(detail.clusterArn).toEqual([
+        { 'Fn::GetAtt': [expect.any(String), 'Arn'] },
+      ]);
+      expect(detail.group).toEqual([
+        {
+          'Fn::Join': ['', ['service:', { 'Fn::GetAtt': [expect.any(String), 'Name'] }]],
+        },
+      ]);
+    });
+
+    it.each([
+      { serviceNames: [] },
+      { serviceNames: [''] },
+      { serviceNames: [SERVICE_NAME, ''] },
+    ])('should throw when serviceNames is empty', (props) => {
+      expect(() => {
+        createTemplate(props);
+      }).toThrow(/serviceNames must not be empty|serviceNames must not contain empty strings/);
+    });
+
+    it('should throw when serviceNames includes the service: prefix', () => {
+      expect(() => {
+        createTemplate({ serviceNames: [SERVICE_NAME, SERVICE_GROUP] });
+      }).toThrow(
+        'serviceNames must be the ECS service name without the "service:" prefix. Use group to match a raw task group.',
+      );
+    });
+
+    it('should throw when service.serviceName is empty', () => {
+      expect(() => {
+        createTemplate({ service: serviceDouble(CLUSTER_ARN, '') });
+      }).toThrow('service.serviceName must not be empty.');
     });
   });
 

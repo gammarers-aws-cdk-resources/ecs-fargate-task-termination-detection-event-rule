@@ -1,4 +1,4 @@
-import { SERVICE_NAME, TASK_DEFINITION_ARN, TASK_GROUP } from './constants';
+import { CLUSTER_ARN, OTHER_CLUSTER_ARN, SERVICE_NAME, TASK_DEFINITION_ARN, TASK_GROUP } from './constants';
 import {
   DefaultExcludedStopCodes,
   DefaultExcludedStoppedReasonPrefixes,
@@ -9,7 +9,7 @@ import {
 } from '../../src';
 
 /**
- * Rule props other than `clusterArn`, which every sample rule fixes.
+ * Rule props other than the cluster input `createTemplate` fills in.
  */
 export type RuleSampleProps = Omit<EcsFargateTaskTerminationDetectionEventRuleProps, 'clusterArn'>;
 
@@ -70,4 +70,6 @@ export const RULE_PROPS_CASES: RulePropsCase[] = [
     },
   },
   { name: 'no startup failure prefixes', props: { startupFailureStoppedReasonPrefixes: [] } },
+  { name: 'clusterArns', props: { clusterArns: [CLUSTER_ARN, OTHER_CLUSTER_ARN] } },
+  { name: 'serviceNames', props: { serviceNames: [SERVICE_NAME, 'example-worker'] } },
 ];

@@ -18,13 +18,13 @@ An AWS CDK construct that creates an Amazon EventBridge rule for unexpected ECS 
 - Uses those `stoppedReason` prefixes when an event has no `stopCode`
 - Replaces or extends either exclusion list
 - Replaces or extends the startup-failure `stoppedReason` prefixes used when `stopCode` is absent
-- Limits matching to one ECS cluster and to `launchType` `FARGATE`
-- Optionally limits that cluster to one service, raw task group, or task definition
+- Limits matching to one or more ECS clusters and to `launchType` `FARGATE`
+- Optionally limits that scope to services, a raw task group, or a task definition
 - Defines its own `eventPattern` (`props.eventPattern` is not allowed)
 
 ## How it works
 
-Create `EcsFargateTaskTerminationDetectionEventRule` with the cluster ARN and add an EventBridge target, such as an SNS topic. The rule then receives `ECS Task State Change` events for that cluster when `launchType` is `FARGATE` and `lastStatus` is `STOPPED`. The default `detectionMode` is `ALL_FAILURES`.
+Create `EcsFargateTaskTerminationDetectionEventRule` with a cluster and add an EventBridge target, such as an SNS topic. Pass `cluster`, `clusterArn`, or `clusterArns`. When only `service` is set, the rule uses that service's cluster. The rule then receives `ECS Task State Change` events for those clusters when `launchType` is `FARGATE` and `lastStatus` is `STOPPED`. The default `detectionMode` is `ALL_FAILURES`.
 
 EC2 and EXTERNAL tasks in the same cluster do not match. Fargate Spot tasks still match, because their `launchType` remains `FARGATE` (`capacityProviderName` is `FARGATE_SPOT`). On the non-zero exit branch, `stopCode` `UserInitiated` and `SpotInterruption` are excluded. Scale-in and rolling replacement stay excluded by the `stoppedReason` prefix `Scaling activity initiated by`, including when `stopCode` is `ServiceSchedulerInitiated`. An event with no `stopCode` uses the `stoppedReason` prefixes alone. A startup failure matches `stopCode` `TaskFailedToStart`. The startup `stoppedReason` prefixes match only when `stopCode` is absent.
 
@@ -66,7 +66,7 @@ These operational stops are ignored on the non-zero `exitCode` branch. Startup-f
 - Startup errors that have neither `stopCode` `TaskFailedToStart` nor one of the default `stoppedReason` prefixes. A startup-like `stoppedReason` paired with a different `stopCode` is not treated as a startup failure.
 - Exit code `0`. A successful container exit is never treated as a failure.
 - Other clusters, non-Fargate launch types, or `lastStatus` other than `STOPPED`.
-- Other services, groups, or task definitions when `serviceName`, `group`, or `taskDefinitionArn` is set. `taskDefinitionArn` is an exact match, including the revision when the event has one.
+- Other services, groups, or task definitions when `serviceName`, `serviceNames`, `service`, `group`, or `taskDefinitionArn` is set. `taskDefinitionArn` is an exact match, including the revision when the event has one.
 - Operational stops with no exit code. Spot, user, and scale-in events that never set `containers.exitCode` do not match the exit-code branch, and they are not startup failures.
 
 ### Limits
@@ -139,6 +139,7 @@ You can also pass `targets` in the constructor (`RuleProps`) instead of calling 
 ### Common customizations
 
 ```typescript
+import { Cluster } from 'aws-cdk-lib/aws-ecs';
 import {
   DefaultExcludedStopCodes,
   DefaultExcludedStoppedReasonPrefixes,
@@ -147,6 +148,22 @@ import {
   EcsFargateTaskTerminationDetectionMode,
   EcsTaskStopCode,
 } from 'ecs-fargate-task-termination-detection-event-rule';
+
+// Watch two clusters and two services
+const multiServiceRule = new EcsFargateTaskTerminationDetectionEventRule(stack, 'MultiServiceRule', {
+  clusterArns: [
+    clusterArn,
+    'arn:aws:ecs:us-east-1:123456789012:cluster/other',
+  ],
+  serviceNames: ['example-api', 'example-worker'],
+});
+multiServiceRule.addTarget(new SnsTopic(alertTopic));
+
+// An existing cluster can be imported. A cluster created in this stack can be passed the same way.
+const importedCluster = Cluster.fromClusterArn(stack, 'ImportedCluster', clusterArn);
+const clusterRule = new EcsFargateTaskTerminationDetectionEventRule(stack, 'ClusterRule', {
+  cluster: importedCluster,
+});
 
 // Watch one Fargate service and one task definition revision
 const serviceRule = new EcsFargateTaskTerminationDetectionEventRule(stack, 'ServiceScopedRule', {
@@ -202,11 +219,17 @@ const extendedExclusionsRule = new EcsFargateTaskTerminationDetectionEventRule(s
 
 ## Options
 
+Set one of `cluster`, `clusterArn`, or `clusterArns`. When `service` is set and none of those are set, the rule uses `service.cluster`.
+
 | Property | Required | Default | Description |
 | --- | --- | --- | --- |
-| `clusterArn` | Yes | | ARN of the ECS cluster to monitor. Matching is always limited to `launchType` `FARGATE` in that cluster. |
-| `serviceName` | No | | ECS service name. Matched as `detail.group` = `service:${serviceName}`. Do not include the `service:` prefix. Must not be empty. Cannot be set together with `group`. |
-| `group` | No | | Raw ECS task group, matched exactly against `detail.group`. Use this for a non-service group. Must not be empty. Cannot be set together with `serviceName`. |
+| `cluster` | No | | `ecs.ICluster` to monitor. A cluster created in the same stack stays a CloudFormation token. Cannot be set together with `clusterArn` or `clusterArns`. |
+| `clusterArn` | No | | ARN of one ECS cluster. The value is placed in the pattern as given, including an empty string. Cannot be set together with `cluster` or `clusterArns`. |
+| `clusterArns` | No | | ARNs of the ECS clusters to monitor. Any listed ARN matches. Must not be empty or contain an empty string. Cannot be set together with `cluster` or `clusterArn`. |
+| `serviceName` | No | | ECS service name. Matched as `detail.group` = `service:${serviceName}`. Do not include the `service:` prefix. Must not be empty. Cannot be set together with `serviceNames`, `service`, or `group`. |
+| `serviceNames` | No | | ECS service names. Each is matched as `detail.group` = `service:${name}`. Any listed service matches. Must not be empty, contain an empty string, or include the `service:` prefix. Cannot be set together with `serviceName`, `service`, or `group`. |
+| `service` | No | | `ecs.IBaseService` to monitor. Matched as `detail.group` = `service:${service.serviceName}`. When no cluster property is set, `service.cluster` selects the cluster. Cannot be set together with `serviceName`, `serviceNames`, or `group`. |
+| `group` | No | | Raw ECS task group, matched exactly against `detail.group`. Use this for a non-service group. Must not be empty. Cannot be set together with `serviceName`, `serviceNames`, or `service`. |
 | `taskDefinitionArn` | No | | Task definition ARN, matched exactly against `detail.taskDefinitionArn`, including the revision when the event has one. Must not be empty. |
 | `detectionMode` | No | `EcsFargateTaskTerminationDetectionMode.ALL_FAILURES` | `ALL_FAILURES` matches a non-zero `exitCode` or a startup failure. `NON_ZERO_EXIT_CODE` matches only non-zero container exit codes. `TASK_FAILED_TO_START` matches `stopCode` `TaskFailedToStart`, and the startup `stoppedReason` prefixes when `stopCode` is absent. |
 | `excludedStopCodes` | No | `DefaultExcludedStopCodes.ALL` | `stopCode` values excluded from non-zero exit-code matching when the event has a `stopCode`. The default is `UserInitiated` and `SpotInterruption`. Pass a new array to replace the default set, spread `DefaultExcludedStopCodes.ALL` and append `EcsTaskStopCode` values to extend it, or pass `[]` to disable this filter. Must not contain empty strings. |
