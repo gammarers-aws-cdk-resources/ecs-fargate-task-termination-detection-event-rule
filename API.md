@@ -901,6 +901,8 @@ Contains {@link DefaultExcludedStopCodes.USER_INITIATED} and
 {@link DefaultExcludedStopCodes.SPOT_INTERRUPTION}.
 The array is frozen. Spread it to extend the set. Mutating it throws,
 so the library default cannot be changed.
+`Object.freeze` is readonly, and jsii rejects a getter named `ALL`.
+The cast keeps `ALL` assignable to `string[]`.
 
 ---
 
@@ -982,6 +984,8 @@ Contains {@link DefaultExcludedStoppedReasonPrefixes.SCALING_ACTIVITY_INITIATED_
 {@link DefaultExcludedStoppedReasonPrefixes.SPOT_TASK_INTERRUPTED}.
 The array is frozen. Spread it to extend the set. Mutating it throws,
 so the library default cannot be changed.
+`Object.freeze` is readonly, and jsii rejects a getter named `ALL`.
+The cast keeps `ALL` assignable to `string[]`.
 
 ---
 
@@ -1075,6 +1079,8 @@ Contains {@link DefaultStartupFailureStoppedReasonPrefixes.CANNOT_PULL_CONTAINER
 {@link DefaultStartupFailureStoppedReasonPrefixes.TASK_FAILED_TO_START}.
 The array is frozen. Spread it to extend the set. Mutating it throws,
 so the library default cannot be changed.
+`Object.freeze` is readonly, and jsii rejects a getter named `ALL`.
+The cast keeps `ALL` assignable to `string[]`.
 
 ---
 

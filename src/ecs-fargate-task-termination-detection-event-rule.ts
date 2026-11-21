@@ -284,29 +284,40 @@ const buildExitCodeExclusion = (ignoredExitCodes: readonly number[]): number | n
 };
 
 /**
- * Builds the `containers` object for one pattern branch.
+ * Builds a name-only `containers` object.
  *
- * @param containerNames - Names to match, or `undefined` to skip the name filter.
- * @param exitCodes - `anything-but` payload for `exitCode`, or `undefined` to skip it.
- * @returns The `containers` object, or `undefined` when both filters are omitted.
+ * @param containerNames - Names to match, or `undefined` to skip the filter.
+ * @returns The `containers` object, or `undefined` when no names are set.
  */
-const buildContainers = (
+const buildContainerNameFilter = (
   containerNames: readonly string[] | undefined,
-  exitCodes: number | number[] | undefined,
 ): Record<string, unknown> | undefined => {
-  if (containerNames === undefined && exitCodes === undefined) {
+  if (containerNames === undefined) {
     return undefined;
   }
 
-  const containers: Record<string, unknown> = {};
-  if (containerNames !== undefined) {
-    containers.name = [...containerNames];
-  }
-  if (exitCodes !== undefined) {
-    containers.exitCode = [{ [ANYTHING_BUT_FILTER]: exitCodes }];
-  }
+  return {
+    name: [...containerNames],
+  };
+};
 
-  return containers;
+/**
+ * Builds the `containers` object for a non-zero exit branch.
+ *
+ * Exit codes are always present on this branch, so the object is never omitted.
+ *
+ * @param containerNames - Names to match, or `undefined` to skip the name filter.
+ * @param exitCodes - `anything-but` payload for `exitCode`.
+ * @returns The `containers` object.
+ */
+const buildExitContainers = (
+  containerNames: readonly string[] | undefined,
+  exitCodes: number | number[],
+): Record<string, unknown> => {
+  return {
+    ...(containerNames === undefined ? {} : { name: [...containerNames] }),
+    exitCode: [{ [ANYTHING_BUT_FILTER]: exitCodes }],
+  };
 };
 
 /**
@@ -332,10 +343,10 @@ const buildNonZeroExitBranches = (options: {
   readonly excludedStoppedReasonPrefixes: readonly string[];
 }): Record<string, unknown>[] => {
   const containers = {
-    containers: buildContainers(
+    containers: buildExitContainers(
       options.containerNames,
       buildExitCodeExclusion(options.ignoredExitCodes),
-    ) as Record<string, unknown>,
+    ),
   };
   const stoppedReasonExclusion = buildStoppedReasonExclusion([...options.excludedStoppedReasonPrefixes]);
   const stoppedReason = stoppedReasonExclusion === undefined
@@ -404,7 +415,7 @@ const buildStartupBranches = (
   prefixes: readonly string[],
   containerNames: readonly string[] | undefined,
 ): Record<string, unknown>[] => {
-  const containers = buildContainers(containerNames, undefined);
+  const containers = buildContainerNameFilter(containerNames);
   const containerFields = containers === undefined ? {} : { containers };
   const withStopCode = {
     ...containerFields,
@@ -823,6 +834,8 @@ export class DefaultExcludedStopCodes {
    * {@link DefaultExcludedStopCodes.SPOT_INTERRUPTION}.
    * The array is frozen. Spread it to extend the set. Mutating it throws,
    * so the library default cannot be changed.
+   * `Object.freeze` is readonly, and jsii rejects a getter named `ALL`.
+   * The cast keeps `ALL` assignable to `string[]`.
    */
   public static readonly ALL: string[] = Object.freeze([
     DefaultExcludedStopCodes.USER_INITIATED,
@@ -867,6 +880,8 @@ export class DefaultExcludedStoppedReasonPrefixes {
    * {@link DefaultExcludedStoppedReasonPrefixes.SPOT_TASK_INTERRUPTED}.
    * The array is frozen. Spread it to extend the set. Mutating it throws,
    * so the library default cannot be changed.
+   * `Object.freeze` is readonly, and jsii rejects a getter named `ALL`.
+   * The cast keeps `ALL` assignable to `string[]`.
    */
   public static readonly ALL: string[] = Object.freeze([
     DefaultExcludedStoppedReasonPrefixes.SCALING_ACTIVITY_INITIATED_BY,
@@ -915,6 +930,8 @@ export class DefaultStartupFailureStoppedReasonPrefixes {
    * {@link DefaultStartupFailureStoppedReasonPrefixes.TASK_FAILED_TO_START}.
    * The array is frozen. Spread it to extend the set. Mutating it throws,
    * so the library default cannot be changed.
+   * `Object.freeze` is readonly, and jsii rejects a getter named `ALL`.
+   * The cast keeps `ALL` assignable to `string[]`.
    */
   public static readonly ALL: string[] = Object.freeze([
     DefaultStartupFailureStoppedReasonPrefixes.CANNOT_PULL_CONTAINER_ERROR,
