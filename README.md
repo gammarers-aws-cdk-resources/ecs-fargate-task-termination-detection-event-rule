@@ -19,7 +19,8 @@ An AWS CDK construct that creates an Amazon EventBridge rule for unexpected ECS 
 - Replaces or extends either exclusion list
 - Replaces or extends the startup-failure `stoppedReason` prefixes used when `stopCode` is absent
 - Limits matching to one or more ECS clusters and to `launchType` `FARGATE`
-- Optionally limits that scope to services, a raw task group, or a task definition
+- Optionally limits that scope to services, a raw task group, a task definition, or named containers
+- Ignores extra container exit codes in addition to `0`
 - Defines its own `eventPattern` (`props.eventPattern` is not allowed)
 
 ## How it works
@@ -37,7 +38,7 @@ EC2 and EXTERNAL tasks in the same cluster do not match. Fargate Spot tasks stil
 | `stopCode` = `TaskFailedToStart` | Task never reached a running container |
 | No `stopCode`, and `stoppedReason` starts with `CannotPullContainerError`, `ResourceInitializationError`, `CannotStartContainerError`, or `Task failed to start` | Image pull, ENI, secrets, or container start failure |
 
-`NON_ZERO_EXIT_CODE` keeps the exit-code rows. `TASK_FAILED_TO_START` keeps the startup and pull rows.
+`NON_ZERO_EXIT_CODE` keeps the exit-code rows. `TASK_FAILED_TO_START` keeps the startup and pull rows. `ignoredExitCodes` removes more exit codes from the exit-code rows. `containerNames` requires the matching container to have one of those names.
 
 ### Excluded (default)
 
@@ -64,15 +65,16 @@ These operational stops are ignored on the non-zero `exitCode` branch. Startup-f
 
 - Startup and pull failures in `NON_ZERO_EXIT_CODE` mode. `CannotPullContainerError`, `ResourceInitializationError`, and `TaskFailedToStart` usually have no `containers.exitCode`, so they are dropped unless you use `ALL_FAILURES` (default) or `TASK_FAILED_TO_START`.
 - Startup errors that have neither `stopCode` `TaskFailedToStart` nor one of the default `stoppedReason` prefixes. A startup-like `stoppedReason` paired with a different `stopCode` is not treated as a startup failure.
-- Exit code `0`. A successful container exit is never treated as a failure.
+- Exit code `0`, and any code listed in `ignoredExitCodes`. A successful container exit is never treated as a failure. Ignored exit codes do not apply to startup-failure matching.
 - Other clusters, non-Fargate launch types, or `lastStatus` other than `STOPPED`.
-- Other services, groups, or task definitions when `serviceName`, `serviceNames`, `service`, `group`, or `taskDefinitionArn` is set. `taskDefinitionArn` is an exact match, including the revision when the event has one.
+- Other services, groups, task definitions, or container names when `serviceName`, `serviceNames`, `service`, `group`, `taskDefinitionArn`, or `containerNames` is set. `taskDefinitionArn` is an exact match, including the revision when the event has one.
 - Operational stops with no exit code. Spot, user, and scale-in events that never set `containers.exitCode` do not match the exit-code branch, and they are not startup failures.
 
 ### Limits
 
 - Exit `137` is SIGKILL. That can be an OOM kill (`OutOfMemoryError` in `stoppedReason` or `containers.reason`) or a force-kill after `stopTimeout` when the process ignored SIGTERM. EventBridge only sees a non-zero `exitCode`, so this rule cannot tell those cases apart. Inspect the event payload or CloudWatch memory metrics in the target.
-- Exit `143` (SIGTERM) and `TerminationNotice` (task retirement or a platform update) still match. Extend `excludedStopCodes` or `excludedStoppedReasonPrefixes` when those events are noise.
+- Exit `143` (SIGTERM) still matches unless you list it in `ignoredExitCodes`. `TerminationNotice` (task retirement or a platform update) also still matches. Extend `excludedStopCodes` or `excludedStoppedReasonPrefixes` when those events are noise.
+- `containerNames` matches one named container. A sidecar exit does not match when the list contains only the application container.
 - Health-check replacements (`Task failed ELB health checks`, container health checks) are treated as failures when they produce a non-zero `exitCode`. They are not in the default exclusion set. Adding `EcsTaskStopCode.SERVICE_SCHEDULER_INITIATED` to `excludedStopCodes` excludes them together with scale-in.
 
 ## Installation
@@ -165,6 +167,13 @@ const clusterRule = new EcsFargateTaskTerminationDetectionEventRule(stack, 'Clus
   cluster: importedCluster,
 });
 
+// Ignore SIGTERM exits and watch only the app container
+const narrowedRule = new EcsFargateTaskTerminationDetectionEventRule(stack, 'NarrowedRule', {
+  clusterArn,
+  containerNames: ['app'],
+  ignoredExitCodes: [143],
+});
+
 // Watch one Fargate service and one task definition revision
 const serviceRule = new EcsFargateTaskTerminationDetectionEventRule(stack, 'ServiceScopedRule', {
   clusterArn,
@@ -231,6 +240,8 @@ Set one of `cluster`, `clusterArn`, or `clusterArns`. When `service` is set and 
 | `service` | No | | `ecs.IBaseService` to monitor. Matched as `detail.group` = `service:${service.serviceName}`. When no cluster property is set, `service.cluster` selects the cluster. Cannot be set together with `serviceName`, `serviceNames`, or `group`. |
 | `group` | No | | Raw ECS task group, matched exactly against `detail.group`. Use this for a non-service group. Must not be empty. Cannot be set together with `serviceName`, `serviceNames`, or `service`. |
 | `taskDefinitionArn` | No | | Task definition ARN, matched exactly against `detail.taskDefinitionArn`, including the revision when the event has one. Must not be empty. |
+| `containerNames` | No | | Container names to monitor. A failure matches when one of these containers meets it, on both the exit-code branch and the startup-failure branch. Must not be empty or contain an empty string. Omit to match any container. |
+| `ignoredExitCodes` | No | | Exit codes ignored in addition to `0` on the non-zero exit branch. For example `[143]` drops SIGTERM. Values must be integers. `0` stays ignored, and duplicates are dropped. Startup-failure matching is unchanged. |
 | `detectionMode` | No | `EcsFargateTaskTerminationDetectionMode.ALL_FAILURES` | `ALL_FAILURES` matches a non-zero `exitCode` or a startup failure. `NON_ZERO_EXIT_CODE` matches only non-zero container exit codes. `TASK_FAILED_TO_START` matches `stopCode` `TaskFailedToStart`, and the startup `stoppedReason` prefixes when `stopCode` is absent. |
 | `excludedStopCodes` | No | `DefaultExcludedStopCodes.ALL` | `stopCode` values excluded from non-zero exit-code matching when the event has a `stopCode`. The default is `UserInitiated` and `SpotInterruption`. Pass a new array to replace the default set, spread `DefaultExcludedStopCodes.ALL` and append `EcsTaskStopCode` values to extend it, or pass `[]` to disable this filter. Must not contain empty strings. |
 | `excludedStoppedReasonPrefixes` | No | `DefaultExcludedStoppedReasonPrefixes.ALL` | `stoppedReason` prefixes excluded from non-zero exit-code matching. Applied together with `excludedStopCodes` when `stopCode` is present, and alone when `stopCode` is absent. Pass a new array to replace the default set, spread `DefaultExcludedStoppedReasonPrefixes.ALL` to extend it, or pass `[]` to disable prefix exclusion. Must not contain empty strings. |

@@ -123,6 +123,16 @@ interface FailureDetailOptions extends ScopeDetailOptions {
    * `stopCode` is absent.
    */
   readonly startupFailureStoppedReasonPrefixes: string[];
+
+  /**
+   * Container names to match, or `undefined` to match every container.
+   */
+  readonly containerNames?: readonly string[];
+
+  /**
+   * Exit codes excluded in addition to the successful code `0`.
+   */
+  readonly ignoredExitCodes: readonly number[];
 }
 
 /**
@@ -161,6 +171,16 @@ interface EventPatternOptions {
    * {@link DefaultStartupFailureStoppedReasonPrefixes.ALL}.
    */
   readonly startupFailureStoppedReasonPrefixes?: string[];
+
+  /**
+   * Container names to match, or `undefined` to match every container.
+   */
+  readonly containerNames?: readonly string[];
+
+  /**
+   * Exit codes excluded in addition to `0`, or `undefined` for none.
+   */
+  readonly ignoredExitCodes?: readonly number[];
 }
 
 /**
@@ -240,6 +260,56 @@ const buildStoppedReasonExclusion = (
 };
 
 /**
+ * Builds the exit codes placed in an `anything-but` filter.
+ *
+ * `0` is always first. Later duplicates are dropped. A single code stays a
+ * number so the default pattern keeps `anything-but: 0`.
+ *
+ * @param ignoredExitCodes - Extra codes to exclude.
+ * @returns The `anything-but` payload.
+ */
+const buildExitCodeExclusion = (ignoredExitCodes: readonly number[]): number | number[] => {
+  const codes: number[] = [];
+  for (const code of [SUCCESSFUL_CONTAINER_EXIT_CODE, ...ignoredExitCodes]) {
+    if (!codes.includes(code)) {
+      codes.push(code);
+    }
+  }
+
+  if (codes.length === 1) {
+    return SUCCESSFUL_CONTAINER_EXIT_CODE;
+  }
+
+  return codes;
+};
+
+/**
+ * Builds the `containers` object for one pattern branch.
+ *
+ * @param containerNames - Names to match, or `undefined` to skip the name filter.
+ * @param exitCodes - `anything-but` payload for `exitCode`, or `undefined` to skip it.
+ * @returns The `containers` object, or `undefined` when both filters are omitted.
+ */
+const buildContainers = (
+  containerNames: readonly string[] | undefined,
+  exitCodes: number | number[] | undefined,
+): Record<string, unknown> | undefined => {
+  if (containerNames === undefined && exitCodes === undefined) {
+    return undefined;
+  }
+
+  const containers: Record<string, unknown> = {};
+  if (containerNames !== undefined) {
+    containers.name = [...containerNames];
+  }
+  if (exitCodes !== undefined) {
+    containers.exitCode = [{ [ANYTHING_BUT_FILTER]: exitCodes }];
+  }
+
+  return containers;
+};
+
+/**
  * Builds the non-zero exit branches.
  *
  * `stopCode` exclusion is the primary filter. Prefix exclusion stays on the
@@ -249,24 +319,25 @@ const buildStoppedReasonExclusion = (
  *
  * EventBridge rejects a branch when a filtered field is missing. When stop
  * codes are excluded, a second branch matches events that omit `stopCode`
- * and applies only the prefix filter.
+ * and applies only the prefix filter. `ignoredExitCodes` widens the exit-code
+ * exclusion. `containerNames` requires the same container to match.
  *
- * @param excludedStoppedReasonPrefixes - Prefixes excluded via `anything-but`.
- * @param excludedStopCodes - Stop codes excluded via `anything-but`.
+ * @param options - Container, exit-code, stop-code, and prefix filters.
  * @returns One branch when no stop code is excluded, otherwise two.
  */
-const buildNonZeroExitBranches = (
-  excludedStoppedReasonPrefixes: string[],
-  excludedStopCodes: string[],
-): Record<string, unknown>[] => {
+const buildNonZeroExitBranches = (options: {
+  readonly containerNames?: readonly string[];
+  readonly ignoredExitCodes: readonly number[];
+  readonly excludedStopCodes: readonly string[];
+  readonly excludedStoppedReasonPrefixes: readonly string[];
+}): Record<string, unknown>[] => {
   const containers = {
-    containers: {
-      exitCode: [
-        { [ANYTHING_BUT_FILTER]: SUCCESSFUL_CONTAINER_EXIT_CODE },
-      ],
-    },
+    containers: buildContainers(
+      options.containerNames,
+      buildExitCodeExclusion(options.ignoredExitCodes),
+    ) as Record<string, unknown>,
   };
-  const stoppedReasonExclusion = buildStoppedReasonExclusion(excludedStoppedReasonPrefixes);
+  const stoppedReasonExclusion = buildStoppedReasonExclusion([...options.excludedStoppedReasonPrefixes]);
   const stoppedReason = stoppedReasonExclusion === undefined
     ? {}
     : { stoppedReason: [stoppedReasonExclusion] };
@@ -275,14 +346,14 @@ const buildNonZeroExitBranches = (
     ...stoppedReason,
   };
 
-  if (excludedStopCodes.length === 0) {
+  if (options.excludedStopCodes.length === 0) {
     return [withStopCode];
   }
 
   return [
     {
       ...withStopCode,
-      stopCode: [{ [ANYTHING_BUT_FILTER]: [...excludedStopCodes] }],
+      stopCode: [{ [ANYTHING_BUT_FILTER]: [...options.excludedStopCodes] }],
     },
     {
       ...containers,
@@ -326,10 +397,17 @@ const attachBranches = (
  * with another stop code is not treated as a startup failure.
  *
  * @param prefixes - Startup-failure prefixes. An empty list leaves only the stop-code branch.
+ * @param containerNames - Container names, or `undefined` to match every container.
  * @returns One branch when there are no prefixes, otherwise two.
  */
-const buildStartupBranches = (prefixes: readonly string[]): Record<string, unknown>[] => {
+const buildStartupBranches = (
+  prefixes: readonly string[],
+  containerNames: readonly string[] | undefined,
+): Record<string, unknown>[] => {
+  const containers = buildContainers(containerNames, undefined);
+  const containerFields = containers === undefined ? {} : { containers };
   const withStopCode = {
+    ...containerFields,
     stopCode: [EcsTaskStopCode.TASK_FAILED_TO_START],
   };
 
@@ -340,6 +418,7 @@ const buildStartupBranches = (prefixes: readonly string[]): Record<string, unkno
   return [
     withStopCode,
     {
+      ...containerFields,
       stopCode: [{ [EXISTS_FILTER]: false }],
       stoppedReason: prefixes.map((prefix) => ({ [PREFIX_FILTER]: prefix })),
     },
@@ -374,6 +453,51 @@ const assertPopulatedStrings = (fieldName: string, values: readonly string[]): v
   if (values.some((value) => value.length === 0)) {
     throw new Error(`${fieldName} must not contain empty strings.`);
   }
+};
+
+/**
+ * Rejects a non-integer.
+ *
+ * @param fieldName - Property name used in the error message.
+ * @param values - Caller-supplied numbers.
+ * @throws Error if any value is not an integer.
+ */
+const assertIntegers = (fieldName: string, values: readonly number[]): void => {
+  if (values.some((value) => !Number.isInteger(value))) {
+    throw new Error(`${fieldName} must contain only integers.`);
+  }
+};
+
+/**
+ * Resolves exit codes that are excluded in addition to `0`.
+ *
+ * @param ignoredExitCodes - Caller-supplied codes, or `undefined` for none.
+ * @returns A copy of the caller list, or an empty array when omitted.
+ * @throws Error if any code is not an integer.
+ */
+const resolveIgnoredExitCodes = (ignoredExitCodes: readonly number[] | undefined): number[] => {
+  if (ignoredExitCodes === undefined) {
+    return [];
+  }
+
+  assertIntegers('ignoredExitCodes', ignoredExitCodes);
+  return [...ignoredExitCodes];
+};
+
+/**
+ * Resolves container names.
+ *
+ * @param containerNames - Caller-supplied names, or `undefined` to match every container.
+ * @returns A copy of the names, or `undefined` when the filter is omitted.
+ * @throws Error if the list is empty or contains an empty string.
+ */
+const resolveContainerNames = (containerNames: readonly string[] | undefined): string[] | undefined => {
+  if (containerNames === undefined) {
+    return undefined;
+  }
+
+  assertPopulatedStrings('containerNames', containerNames);
+  return [...containerNames];
 };
 
 /**
@@ -536,24 +660,26 @@ const buildScopeDetail = (options: ScopeDetailOptions): Record<string, unknown> 
  * @throws Error if `options.detectionMode` is unsupported.
  */
 const buildFailureDetail = (options: FailureDetailOptions): Record<string, unknown> => {
-  const { detectionMode, excludedStopCodes, excludedStoppedReasonPrefixes, startupFailureStoppedReasonPrefixes } = options;
   const base = buildScopeDetail(options);
-  const exitBranches = buildNonZeroExitBranches(excludedStoppedReasonPrefixes, excludedStopCodes);
-  const startupBranches = buildStartupBranches(startupFailureStoppedReasonPrefixes);
+  const exitBranches = buildNonZeroExitBranches(options);
+  const startupBranches = buildStartupBranches(
+    options.startupFailureStoppedReasonPrefixes,
+    options.containerNames,
+  );
 
-  if (detectionMode === EcsFargateTaskTerminationDetectionMode.NON_ZERO_EXIT_CODE) {
+  if (options.detectionMode === EcsFargateTaskTerminationDetectionMode.NON_ZERO_EXIT_CODE) {
     return attachBranches(base, exitBranches);
   }
 
-  if (detectionMode === EcsFargateTaskTerminationDetectionMode.TASK_FAILED_TO_START) {
+  if (options.detectionMode === EcsFargateTaskTerminationDetectionMode.TASK_FAILED_TO_START) {
     return attachBranches(base, startupBranches);
   }
 
-  if (detectionMode === EcsFargateTaskTerminationDetectionMode.ALL_FAILURES) {
+  if (options.detectionMode === EcsFargateTaskTerminationDetectionMode.ALL_FAILURES) {
     return attachBranches(base, [...exitBranches, ...startupBranches]);
   }
 
-  throw new Error(`Unsupported detectionMode: ${detectionMode}`);
+  throw new Error(`Unsupported detectionMode: ${options.detectionMode}`);
 };
 
 /**
@@ -567,6 +693,8 @@ const buildFailureDetail = (options: FailureDetailOptions): Record<string, unkno
  * @throws Error if the cluster or service selection is invalid.
  * @throws Error if `options.excludedStopCodes`, `options.excludedStoppedReasonPrefixes`,
  *   or `options.startupFailureStoppedReasonPrefixes` contains an empty string.
+ * @throws Error if `options.containerNames` is empty or contains an empty string.
+ * @throws Error if `options.ignoredExitCodes` contains a non-integer.
  * @throws Error if `options.detectionMode` is unsupported.
  */
 const buildEventPattern = (options: EventPatternOptions): EventPattern => {
@@ -588,6 +716,8 @@ const buildEventPattern = (options: EventPatternOptions): EventPattern => {
       startupFailureStoppedReasonPrefixes: resolveStartupFailureStoppedReasonPrefixes(
         options.startupFailureStoppedReasonPrefixes,
       ),
+      containerNames: resolveContainerNames(options.containerNames),
+      ignoredExitCodes: resolveIgnoredExitCodes(options.ignoredExitCodes),
     }),
   };
 };
@@ -598,10 +728,10 @@ const buildEventPattern = (options: EventPatternOptions): EventPattern => {
  */
 export enum EcsFargateTaskTerminationDetectionMode {
   /**
-   * Detect only container exits with a non-zero `exitCode`.
+   * Detect only container exits with a non-zero `exitCode`, ignoring codes in
+   * `ignoredExitCodes`.
    *
-   * Does not match startup/pull failures (for example `CannotPullContainerError`)
-   * where `containers.exitCode` is absent.
+   * Does not match startup failures where `containers.exitCode` is absent.
    */
   NON_ZERO_EXIT_CODE = 'NON_ZERO_EXIT_CODE',
 
@@ -883,6 +1013,27 @@ export interface EcsFargateTaskTerminationDetectionEventRuleProps extends RulePr
   readonly taskDefinitionArn?: string;
 
   /**
+   * Container names to monitor.
+   *
+   * The rule matches when one of these containers satisfies the failure
+   * condition. Other containers in the task are ignored. Applies to both the
+   * non-zero exit branch and the startup-failure branch. Omit to match any
+   * container.
+   */
+  readonly containerNames?: string[];
+
+  /**
+   * Container exit codes to ignore, in addition to the successful code `0`.
+   *
+   * Applies only to non-zero exit matching. For example, `143` drops SIGTERM
+   * exits that are not already excluded by `stopCode` or `stoppedReason`.
+   * Startup-failure matching is unchanged. `0` is always ignored.
+   *
+   * @default - only exit code 0 is ignored
+   */
+  readonly ignoredExitCodes?: number[];
+
+  /**
    * How task failures are matched in the EventBridge event pattern.
    *
    * @default EcsFargateTaskTerminationDetectionMode.ALL_FAILURES
@@ -963,8 +1114,9 @@ export interface EcsFargateTaskTerminationDetectionEventRuleProps extends RulePr
  *
  * This rule defines its own `eventPattern` and does not accept `props.eventPattern`.
  * The pattern is scoped to the selected clusters and to `launchType` `FARGATE`.
- * Optional `serviceName`, `serviceNames`, `service`, `group`, and
- * `taskDefinitionArn` narrow that scope further.
+ * Optional `serviceName`, `serviceNames`, `service`, `group`, `taskDefinitionArn`,
+ * and `containerNames` narrow that scope further. `ignoredExitCodes` drops more
+ * exit codes on the non-zero exit branch.
  */
 export class EcsFargateTaskTerminationDetectionEventRule extends Rule {
   /**
@@ -982,6 +1134,8 @@ export class EcsFargateTaskTerminationDetectionEventRule extends Rule {
    * @throws Error if `serviceName`, `serviceNames`, `service.serviceName`, `group`,
    *   or `taskDefinitionArn` is empty.
    * @throws Error if a service name starts with `service:`.
+   * @throws Error if `containerNames` is empty or contains an empty string.
+   * @throws Error if `ignoredExitCodes` contains a non-integer.
    * @throws Error if `props.excludedStopCodes`, `props.excludedStoppedReasonPrefixes`,
    *   or `props.startupFailureStoppedReasonPrefixes` contains an empty string.
    * @throws Error if `props.detectionMode` is unsupported.
@@ -1001,6 +1155,8 @@ export class EcsFargateTaskTerminationDetectionEventRule extends Rule {
       service,
       group,
       taskDefinitionArn,
+      containerNames,
+      ignoredExitCodes,
       ...restProps
     } = props;
 
@@ -1021,6 +1177,8 @@ export class EcsFargateTaskTerminationDetectionEventRule extends Rule {
         excludedStopCodes,
         excludedStoppedReasonPrefixes,
         startupFailureStoppedReasonPrefixes,
+        containerNames,
+        ignoredExitCodes,
         scope: {
           serviceName,
           serviceNames,

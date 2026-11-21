@@ -20,8 +20,9 @@ use {@link DefaultExcludedStoppedReasonPrefixes.ALL}.
 
 This rule defines its own `eventPattern` and does not accept `props.eventPattern`.
 The pattern is scoped to the selected clusters and to `launchType` `FARGATE`.
-Optional `serviceName`, `serviceNames`, `service`, `group`, and
-`taskDefinitionArn` narrow that scope further.
+Optional `serviceName`, `serviceNames`, `service`, `group`, `taskDefinitionArn`,
+and `containerNames` narrow that scope further. `ignoredExitCodes` drops more
+exit codes on the non-zero exit branch.
 
 #### Initializers <a name="Initializers" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRule.Initializer"></a>
 
@@ -431,10 +432,12 @@ const ecsFargateTaskTerminationDetectionEventRuleProps: EcsFargateTaskTerminatio
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.cluster">cluster</a></code> | <code>aws-cdk-lib.aws_ecs.ICluster</code> | ECS cluster to monitor. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.clusterArn">clusterArn</a></code> | <code>string</code> | ARN of one ECS cluster to monitor. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.clusterArns">clusterArns</a></code> | <code>string[]</code> | ARNs of the ECS clusters to monitor. |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.containerNames">containerNames</a></code> | <code>string[]</code> | Container names to monitor. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.detectionMode">detectionMode</a></code> | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode">EcsFargateTaskTerminationDetectionMode</a></code> | How task failures are matched in the EventBridge event pattern. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.excludedStopCodes">excludedStopCodes</a></code> | <code>string[]</code> | `stopCode` values excluded from non-zero exit-code matching. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.excludedStoppedReasonPrefixes">excludedStoppedReasonPrefixes</a></code> | <code>string[]</code> | `stoppedReason` prefixes excluded from non-zero exit-code matching via EventBridge `anything-but` prefix matching. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.group">group</a></code> | <code>string</code> | Raw ECS task group used to narrow matching. |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.ignoredExitCodes">ignoredExitCodes</a></code> | <code>number[]</code> | Container exit codes to ignore, in addition to the successful code `0`. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.service">service</a></code> | <code>aws-cdk-lib.aws_ecs.IBaseService</code> | ECS service to monitor. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.serviceName">serviceName</a></code> | <code>string</code> | ECS service name used to narrow matching to one service. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.serviceNames">serviceNames</a></code> | <code>string[]</code> | ECS service names used to narrow matching to those services. |
@@ -637,6 +640,23 @@ or {@link EcsFargateTaskTerminationDetectionEventRuleProps.clusterArn}.
 
 ---
 
+##### `containerNames`<sup>Optional</sup> <a name="containerNames" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.containerNames"></a>
+
+```typescript
+public readonly containerNames: string[];
+```
+
+- *Type:* string[]
+
+Container names to monitor.
+
+The rule matches when one of these containers satisfies the failure
+condition. Other containers in the task are ignored. Applies to both the
+non-zero exit branch and the startup-failure branch. Omit to match any
+container.
+
+---
+
 ##### `detectionMode`<sup>Optional</sup> <a name="detectionMode" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.detectionMode"></a>
 
 ```typescript
@@ -711,6 +731,23 @@ Matched exactly against `detail.group`. Use this for a non-service task
 group. For an ECS service, use `serviceName`, `serviceNames`, or `service`.
 
 Cannot be set together with `serviceName`, `serviceNames`, or `service`.
+
+---
+
+##### `ignoredExitCodes`<sup>Optional</sup> <a name="ignoredExitCodes" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.ignoredExitCodes"></a>
+
+```typescript
+public readonly ignoredExitCodes: number[];
+```
+
+- *Type:* number[]
+- *Default:* only exit code 0 is ignored
+
+Container exit codes to ignore, in addition to the successful code `0`.
+
+Applies only to non-zero exit matching. For example, `143` drops SIGTERM
+exits that are not already excluded by `stopCode` or `stoppedReason`.
+Startup-failure matching is unchanged. `0` is always ignored.
 
 ---
 
@@ -1090,7 +1127,7 @@ How {@link EcsFargateTaskTerminationDetectionEventRule} matches ECS/Fargate task
 
 | **Name** | **Description** |
 | --- | --- |
-| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode.NON_ZERO_EXIT_CODE">NON_ZERO_EXIT_CODE</a></code> | Detect only container exits with a non-zero `exitCode`. |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode.NON_ZERO_EXIT_CODE">NON_ZERO_EXIT_CODE</a></code> | Detect only container exits with a non-zero `exitCode`, ignoring codes in `ignoredExitCodes`. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode.TASK_FAILED_TO_START">TASK_FAILED_TO_START</a></code> | Detect only tasks that failed to start. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode.ALL_FAILURES">ALL_FAILURES</a></code> | Detect both non-zero exit codes and startup/pull failures (`TaskFailedToStart` / known `stoppedReason` prefixes). |
 
@@ -1098,10 +1135,9 @@ How {@link EcsFargateTaskTerminationDetectionEventRule} matches ECS/Fargate task
 
 ##### `NON_ZERO_EXIT_CODE` <a name="NON_ZERO_EXIT_CODE" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode.NON_ZERO_EXIT_CODE"></a>
 
-Detect only container exits with a non-zero `exitCode`.
+Detect only container exits with a non-zero `exitCode`, ignoring codes in `ignoredExitCodes`.
 
-Does not match startup/pull failures (for example `CannotPullContainerError`)
-where `containers.exitCode` is absent.
+Does not match startup failures where `containers.exitCode` is absent.
 
 ---
 

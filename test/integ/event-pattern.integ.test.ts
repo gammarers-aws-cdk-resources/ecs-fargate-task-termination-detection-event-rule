@@ -10,10 +10,10 @@
  * `AWS_DEFAULT_REGION`, or the shared AWS config file.
  */
 import { EventBridgeClient, TestEventPatternCommand } from '@aws-sdk/client-eventbridge';
-import { CLUSTER_ARN, SERVICE_NAME, TEST_ACCOUNT_ID, TEST_REGION } from '../fixtures/constants';
-import { RULE_PROPS_CASES } from '../fixtures/rule-props';
+import { CLUSTER_ARN, TEST_ACCOUNT_ID, TEST_REGION } from '../fixtures/constants';
+import { RULE_PROPS_CASES, SAMPLE_RULES } from '../fixtures/rule-props';
 import { createTemplate } from '../fixtures/synthesize';
-import { TASK_EVENT_CASES } from '../fixtures/task-events';
+import { type SampleRule, TASK_EVENT_CASES } from '../fixtures/task-events';
 import { eventMatchesPattern, readEventPattern } from '../match-event-pattern';
 
 /**
@@ -79,10 +79,11 @@ const matchesOnEventBridge = async (
   return output.Result === true;
 };
 
-const sampleRulePatterns = {
-  default: readEventPattern(createTemplate().toJSON()),
-  service: readEventPattern(createTemplate({ serviceName: SERVICE_NAME }).toJSON()),
-};
+const sampleRulePatterns = Object.fromEntries(
+  (Object.entries(SAMPLE_RULES) as [SampleRule, (typeof SAMPLE_RULES)[SampleRule]][]).map(([name, props]) => {
+    return [name, readEventPattern(createTemplate(props).toJSON())];
+  }),
+) as Record<SampleRule, Record<string, unknown>>;
 
 describe('EventBridge TestEventPattern', () => {
   describe('pattern validity', () => {

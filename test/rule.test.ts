@@ -18,9 +18,9 @@ import {
   EcsTaskStopCode,
 } from '../src';
 import { CLUSTER_ARN, OTHER_CLUSTER_ARN, SERVICE_NAME, TASK_DEFINITION_ARN, TASK_GROUP } from './fixtures/constants';
-import { RULE_PROPS_CASES } from './fixtures/rule-props';
+import { RULE_PROPS_CASES, SAMPLE_RULES } from './fixtures/rule-props';
 import { createStack, createTemplate } from './fixtures/synthesize';
-import { TASK_EVENT_CASES } from './fixtures/task-events';
+import { type SampleRule, TASK_EVENT_CASES } from './fixtures/task-events';
 import { eventMatchesPattern, readEventPattern } from './match-event-pattern';
 
 const SERVICE_GROUP = `service:${SERVICE_NAME}`;
@@ -46,12 +46,6 @@ const DEFAULT_EXCLUDED_STOP_CODES = [
   DefaultExcludedStopCodes.SPOT_INTERRUPTION,
 ];
 
-const EXIT_CODE_CONDITION = {
-  containers: {
-    exitCode: [{ 'anything-but': 0 }],
-  },
-};
-
 const stopCodeExclusion = (codes: string[]): Record<string, unknown> => ({
   'anything-but': codes,
 });
@@ -66,12 +60,20 @@ const stopCodeExclusion = (codes: string[]): Record<string, unknown> => ({
 const exitBranches = (
   prefixes: string[],
   stopCodes: string[] = DEFAULT_EXCLUDED_STOP_CODES,
+  exitCode: Record<string, unknown> = { 'anything-but': 0 },
+  containerNames?: string[],
 ): Record<string, unknown>[] => {
+  const containers = {
+    containers: {
+      ...(containerNames === undefined ? {} : { name: containerNames }),
+      exitCode: [exitCode],
+    },
+  };
   const stoppedReason = prefixes.length === 0
     ? {}
     : { stoppedReason: [stoppedReasonExclusion(prefixes)] };
   const withStopCode = {
-    ...EXIT_CODE_CONDITION,
+    ...containers,
     ...stoppedReason,
   };
   if (stopCodes.length === 0) {
@@ -79,7 +81,7 @@ const exitBranches = (
   }
   return [
     { ...withStopCode, stopCode: [stopCodeExclusion(stopCodes)] },
-    { ...EXIT_CODE_CONDITION, stopCode: [{ exists: false }], ...stoppedReason },
+    { ...containers, stopCode: [{ exists: false }], ...stoppedReason },
   ];
 };
 
@@ -100,14 +102,19 @@ const DEFAULT_STARTUP_PREFIXES = [
  * @param prefixes - Prefixes matched when `stopCode` is absent.
  * @returns One branch when `prefixes` is empty, otherwise the stop-code and prefix branches.
  */
-const startupBranches = (prefixes: string[] = DEFAULT_STARTUP_PREFIXES): Record<string, unknown>[] => {
-  const withStopCode = { stopCode: [EcsTaskStopCode.TASK_FAILED_TO_START] };
+const startupBranches = (
+  prefixes: string[] = DEFAULT_STARTUP_PREFIXES,
+  containerNames?: string[],
+): Record<string, unknown>[] => {
+  const containers = containerNames === undefined ? {} : { containers: { name: containerNames } };
+  const withStopCode = { ...containers, stopCode: [EcsTaskStopCode.TASK_FAILED_TO_START] };
   if (prefixes.length === 0) {
     return [withStopCode];
   }
   return [
     withStopCode,
     {
+      ...containers,
       stopCode: [{ exists: false }],
       stoppedReason: prefixes.map((prefix) => ({ prefix })),
     },
@@ -608,6 +615,41 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
     });
   });
 
+  describe('container filters', () => {
+    it('should ignore extra exit codes and limit container names', () => {
+      expectEventPattern(createTemplate({
+        ignoredExitCodes: [143, 143, 0],
+        containerNames: ['app', 'worker'],
+      }), {
+        $or: [
+          ...exitBranches(
+            DEFAULT_EXCLUDED_PREFIXES,
+            DEFAULT_EXCLUDED_STOP_CODES,
+            { 'anything-but': [0, 143] },
+            ['app', 'worker'],
+          ),
+          ...startupBranches(DEFAULT_STARTUP_PREFIXES, ['app', 'worker']),
+        ],
+      });
+    });
+
+    it('should throw when ignoredExitCodes contains a non-integer', () => {
+      expect(() => {
+        createTemplate({ ignoredExitCodes: [143, 1.5] });
+      }).toThrow('ignoredExitCodes must contain only integers.');
+    });
+
+    it.each([
+      { containerNames: [] },
+      { containerNames: [''] },
+      { containerNames: ['app', ''] },
+    ])('should throw when containerNames is empty', (props) => {
+      expect(() => {
+        createTemplate(props);
+      }).toThrow(/containerNames must not be empty|containerNames must not contain empty strings/);
+    });
+  });
+
   it('should throw when eventPattern is provided', () => {
     expect(() => {
       createTemplate({
@@ -621,10 +663,11 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
   });
 
   describe('event matching', () => {
-    const patterns = {
-      default: readEventPattern(createTemplate().toJSON()),
-      service: readEventPattern(createTemplate({ serviceName: SERVICE_NAME }).toJSON()),
-    };
+    const patterns = Object.fromEntries(
+      (Object.entries(SAMPLE_RULES) as [SampleRule, (typeof SAMPLE_RULES)[SampleRule]][]).map(([name, props]) => {
+        return [name, readEventPattern(createTemplate(props).toJSON())];
+      }),
+    ) as Record<SampleRule, Record<string, unknown>>;
 
     it.each(TASK_EVENT_CASES)('$name', ({ rule, event, expectation }) => {
       const matched = eventMatchesPattern(event, patterns[rule]);

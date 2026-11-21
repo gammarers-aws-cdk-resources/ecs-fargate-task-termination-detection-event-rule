@@ -9,8 +9,10 @@ import { CLUSTER_ARN, OTHER_CLUSTER_ARN, SERVICE_NAME } from './constants';
  *
  * - `default`: every Fargate task in {@link CLUSTER_ARN}.
  * - `service`: only the service named {@link SERVICE_NAME}.
+ * - `ignoredExit`: `default`, plus exit code 143 ignored.
+ * - `containerName`: `default`, limited to the `app` container.
  */
-export type SampleRule = 'default' | 'service';
+export type SampleRule = 'default' | 'service' | 'ignoredExit' | 'containerName';
 
 /**
  * Whether the rule should match the event.
@@ -229,6 +231,79 @@ export const TASK_EVENT_CASES: TaskEventCase[] = [
     event: taskEvent({
       stoppedReason: 'CannotPullContainerError: pull access denied',
       stopCode: 'EssentialContainerExited',
+    }),
+    expectation: 'miss',
+  },
+  {
+    name: 'ignores an exit code listed in ignoredExitCodes',
+    rule: 'ignoredExit',
+    event: taskEvent({
+      containers: [{ name: 'app', exitCode: 143 }],
+      stoppedReason: 'Essential container in task exited',
+      stopCode: 'EssentialContainerExited',
+    }),
+    expectation: 'miss',
+  },
+  {
+    name: 'matches another non-zero exit when one code is ignored',
+    rule: 'ignoredExit',
+    event: taskEvent({
+      containers: [{ name: 'app', exitCode: 1 }],
+      stoppedReason: 'Essential container in task exited',
+      stopCode: 'EssentialContainerExited',
+    }),
+    expectation: 'match',
+  },
+  {
+    name: 'still matches TaskFailedToStart when the exit code is ignored',
+    rule: 'ignoredExit',
+    event: taskEvent({
+      containers: [{ name: 'app', exitCode: 143 }],
+      stopCode: 'TaskFailedToStart',
+    }),
+    expectation: 'match',
+  },
+  {
+    name: 'matches the named container exit',
+    rule: 'containerName',
+    event: taskEvent({
+      containers: [
+        { name: 'sidecar', exitCode: 0 },
+        { name: 'app', exitCode: 1 },
+      ],
+      stoppedReason: 'Essential container in task exited',
+      stopCode: 'EssentialContainerExited',
+    }),
+    expectation: 'match',
+  },
+  {
+    name: 'ignores a sidecar exit when containerNames is set',
+    rule: 'containerName',
+    event: taskEvent({
+      containers: [
+        { name: 'sidecar', exitCode: 1 },
+        { name: 'app', exitCode: 0 },
+      ],
+      stoppedReason: 'Essential container in task exited',
+      stopCode: 'EssentialContainerExited',
+    }),
+    expectation: 'miss',
+  },
+  {
+    name: 'matches a startup failure for the named container',
+    rule: 'containerName',
+    event: taskEvent({
+      containers: [{ name: 'app' }],
+      stopCode: 'TaskFailedToStart',
+    }),
+    expectation: 'match',
+  },
+  {
+    name: 'ignores a startup failure for another container',
+    rule: 'containerName',
+    event: taskEvent({
+      containers: [{ name: 'sidecar' }],
+      stoppedReason: 'CannotPullContainerError: pull access denied',
     }),
     expectation: 'miss',
   },
