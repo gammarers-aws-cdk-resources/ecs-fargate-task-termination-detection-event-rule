@@ -85,33 +85,31 @@ const sampleRulePatterns = Object.fromEntries(
   }),
 ) as Record<SampleRule, Record<string, unknown>>;
 
-describe('EventBridge TestEventPattern', () => {
-  describe('pattern validity', () => {
-    it.each(RULE_PROPS_CASES)('accepts the pattern for $name', async ({ props }) => {
-      const pattern = readEventPattern(createTemplate(props).toJSON());
+describe('pattern validity', () => {
+  it.each(RULE_PROPS_CASES)('accepts the pattern for $name', async ({ props }) => {
+    const pattern = readEventPattern(createTemplate(props).toJSON());
 
-      await expect(matchesOnEventBridge(pattern, TASK_EVENT_CASES[0].event))
-        .resolves.toEqual(expect.any(Boolean));
-    });
-
-    // Guards the original bug: a leaf value must be an array.
-    it('rejects a leaf value that is not an array', async () => {
-      const pattern = { detail: { clusterArn: CLUSTER_ARN } };
-
-      await expect(matchesOnEventBridge(pattern, TASK_EVENT_CASES[0].event))
-        .rejects.toMatchObject({ name: INVALID_EVENT_PATTERN_EXCEPTION });
-    });
+    await expect(matchesOnEventBridge(pattern, TASK_EVENT_CASES[0].event))
+      .resolves.toEqual(expect.any(Boolean));
   });
 
-  describe('match results', () => {
-    it.each(TASK_EVENT_CASES)('$name', async ({ rule, event, expectation }) => {
-      const pattern = sampleRulePatterns[rule];
+  // Guards the original bug: a leaf value must be an array.
+  it('rejects a leaf value that is not an array', async () => {
+    const pattern = { detail: { clusterArn: CLUSTER_ARN } };
 
-      const matchedOnEventBridge = await matchesOnEventBridge(pattern, event);
+    await expect(matchesOnEventBridge(pattern, TASK_EVENT_CASES[0].event))
+      .rejects.toMatchObject({ name: INVALID_EVENT_PATTERN_EXCEPTION });
+  });
+});
 
-      expect(matchedOnEventBridge).toBe(expectation === 'match');
-      // The unit tests rely on this matcher, so it must agree with EventBridge.
-      expect(eventMatchesPattern(event, pattern)).toBe(matchedOnEventBridge);
-    });
+describe('match results', () => {
+  it.each(TASK_EVENT_CASES)('$name', async ({ rule, event, expectation }) => {
+    const pattern = sampleRulePatterns[rule];
+
+    const matchedOnEventBridge = await matchesOnEventBridge(pattern, event);
+
+    expect(matchedOnEventBridge).toBe(expectation === 'match');
+    // The unit tests rely on this matcher, so it must agree with EventBridge.
+    expect(eventMatchesPattern(event, pattern)).toBe(matchedOnEventBridge);
   });
 });

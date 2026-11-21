@@ -1,6 +1,6 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for ALL_FAILURES 1`] = `
+exports[`snapshots should match the snapshot for ALL_FAILURES 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -147,7 +147,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for NON_ZERO_EXIT_CODE 1`] = `
+exports[`snapshots should match the snapshot for NON_ZERO_EXIT_CODE 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -268,7 +268,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for TASK_FAILED_TO_START 1`] = `
+exports[`snapshots should match the snapshot for TASK_FAILED_TO_START 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -362,7 +362,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for clusterArns 1`] = `
+exports[`snapshots should match the snapshot for clusterArns 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -510,7 +510,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for containerNames 1`] = `
+exports[`snapshots should match the snapshot for containerNames 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -673,7 +673,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for defaults 1`] = `
+exports[`snapshots should match the snapshot for defaults 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -820,7 +820,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for extended excluded stop codes 1`] = `
+exports[`snapshots should match the snapshot for extended excluded stop codes 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -968,7 +968,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for extended excluded stoppedReason prefixes 1`] = `
+exports[`snapshots should match the snapshot for extended excluded stoppedReason prefixes 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -1117,7 +1117,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for extended startup failure prefixes 1`] = `
+exports[`snapshots should match the snapshot for extended startup failure prefixes 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -1267,7 +1267,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for group 1`] = `
+exports[`snapshots should match the snapshot for group 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -1417,7 +1417,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for ignoredExitCodes 1`] = `
+exports[`snapshots should match the snapshot for ignoredExitCodes 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -1570,7 +1570,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for no excluded stoppedReason prefixes 1`] = `
+exports[`snapshots should match the snapshot for no excluded stoppedReason prefixes 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -1695,7 +1695,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for no startup failure prefixes 1`] = `
+exports[`snapshots should match the snapshot for no startup failure prefixes 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -1821,7 +1821,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for replaced excluded stop codes 1`] = `
+exports[`snapshots should match the snapshot for replaced excluded stop codes 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -1967,7 +1967,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for serviceName 1`] = `
+exports[`snapshots should match the snapshot for serviceName 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -2117,7 +2117,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for serviceName and taskDefinitionArn 1`] = `
+exports[`snapshots should match the snapshot for serviceName and taskDefinitionArn 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -2270,7 +2270,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for serviceNames 1`] = `
+exports[`snapshots should match the snapshot for serviceNames 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -2421,7 +2421,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for taskDefinitionArn 1`] = `
+exports[`snapshots should match the snapshot for taskDefinitionArn 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
