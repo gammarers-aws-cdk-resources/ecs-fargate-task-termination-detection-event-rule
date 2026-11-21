@@ -14,7 +14,9 @@ An AWS CDK construct that creates an Amazon EventBridge rule for unexpected ECS 
 - Matches ECS task state changes whose `lastStatus` is `STOPPED`
 - By default, matches both non-zero container exit codes and startup or image-pull failures
 - Narrows matching to exit codes only, or to startup failures only, with `detectionMode`
-- Replaces or extends the default operational-stop exclusions with `excludedStoppedReasonPrefixes`
+- Excludes user stops and Spot interruptions by `stopCode`, and scale-in by a `stoppedReason` prefix
+- Uses those `stoppedReason` prefixes when an event has no `stopCode`
+- Replaces or extends either exclusion list
 - Limits matching to one ECS cluster and to `launchType` `FARGATE`
 - Optionally limits that cluster to one service, raw task group, or task definition
 - Defines its own `eventPattern` (`props.eventPattern` is not allowed)
@@ -23,27 +25,39 @@ An AWS CDK construct that creates an Amazon EventBridge rule for unexpected ECS 
 
 Create `EcsFargateTaskTerminationDetectionEventRule` with the cluster ARN and add an EventBridge target, such as an SNS topic. The rule then receives `ECS Task State Change` events for that cluster when `launchType` is `FARGATE` and `lastStatus` is `STOPPED`. The default `detectionMode` is `ALL_FAILURES`.
 
-EC2 and EXTERNAL tasks in the same cluster do not match. Fargate Spot tasks still match, because their `launchType` remains `FARGATE` (`capacityProviderName` is `FARGATE_SPOT`). Spot reclaim is excluded on the non-zero exit-code branch by the default `stoppedReason` prefixes.
+EC2 and EXTERNAL tasks in the same cluster do not match. Fargate Spot tasks still match, because their `launchType` remains `FARGATE` (`capacityProviderName` is `FARGATE_SPOT`). On the non-zero exit branch, `stopCode` `UserInitiated` and `SpotInterruption` are excluded. Scale-in and rolling replacement stay excluded by the `stoppedReason` prefix `Scaling activity initiated by`, including when `stopCode` is `ServiceSchedulerInitiated`. An event with no `stopCode` uses the `stoppedReason` prefixes alone.
 
 ### Matched
 
 | Condition | Typical cause |
 | --- | --- |
-| Non-zero `containers.exitCode`, and `stoppedReason` does not start with an excluded prefix | Application crash, OOM, unhandled SIGKILL, health-check replacement |
+| Non-zero `containers.exitCode`, `stopCode` is not excluded, and `stoppedReason` does not start with an excluded prefix | Application crash, OOM, unhandled SIGKILL, health-check replacement |
+| Non-zero `containers.exitCode`, no `stopCode`, and `stoppedReason` does not start with an excluded prefix | The same failures when the event omits `stopCode` |
 | `stopCode` = `TaskFailedToStart` | Task never reached a running container |
 | `stoppedReason` starts with `CannotPullContainerError` or `ResourceInitializationError` | Image pull, ENI, or secrets init failure when `exitCode` is absent |
 
-`NON_ZERO_EXIT_CODE` keeps only the first row. `TASK_FAILED_TO_START` keeps only the startup and pull rows.
+`NON_ZERO_EXIT_CODE` keeps the exit-code rows. `TASK_FAILED_TO_START` keeps the startup and pull rows.
 
 ### Excluded (default)
 
-These operational stops are ignored on the non-zero `exitCode` branch. Startup-failure matching does not apply these exclusions.
+These operational stops are ignored on the non-zero `exitCode` branch. Startup-failure matching does not apply them.
+
+`stopCode` is the primary filter and applies when the event has one.
+
+| Stop code | Constant | Typical cause |
+| --- | --- | --- |
+| `UserInitiated` | `DefaultExcludedStopCodes.USER_INITIATED` | Console or API stop, including when `stoppedReason` uses different wording |
+| `SpotInterruption` | `DefaultExcludedStopCodes.SPOT_INTERRUPTION` | Fargate Spot reclaim |
+
+`ServiceSchedulerInitiated` is not in this set. ELB health-check replacement uses that code as well as scale-in. `TerminationNotice` is not in this set, so platform updates and host retirement still match. Add either value from `EcsTaskStopCode` to `excludedStopCodes` to exclude it. Excluding `ServiceSchedulerInitiated` also drops ELB health-check stops.
+
+`stoppedReason` prefixes apply on the same branch, and they are the only operational-stop filter when `stopCode` is absent.
 
 | Prefix | Constant | Typical cause |
 | --- | --- | --- |
 | `Scaling activity initiated by` | `DefaultExcludedStoppedReasonPrefixes.SCALING_ACTIVITY_INITIATED_BY` | Service scale-in and rolling deployment replacement (`Scaling activity initiated by (deployment ...)`) |
-| `Task stopped by user` | `DefaultExcludedStoppedReasonPrefixes.TASK_STOPPED_BY_USER` | Console or API stop (`stopCode` = `UserInitiated`) |
-| `Your Spot Task was interrupted` | `DefaultExcludedStoppedReasonPrefixes.SPOT_TASK_INTERRUPTED` | Fargate Spot reclaim (`stopCode` = `SpotInterruption`) |
+| `Task stopped by user` | `DefaultExcludedStoppedReasonPrefixes.TASK_STOPPED_BY_USER` | Console or API stop when `stopCode` is absent |
+| `Your Spot Task was interrupted` | `DefaultExcludedStoppedReasonPrefixes.SPOT_TASK_INTERRUPTED` | Fargate Spot reclaim when `stopCode` is absent |
 
 ### Missed
 
@@ -57,8 +71,8 @@ These operational stops are ignored on the non-zero `exitCode` branch. Startup-f
 ### Limits
 
 - Exit `137` is SIGKILL. That can be an OOM kill (`OutOfMemoryError` in `stoppedReason` or `containers.reason`) or a force-kill after `stopTimeout` when the process ignored SIGTERM. EventBridge only sees a non-zero `exitCode`, so this rule cannot tell those cases apart. Inspect the event payload or CloudWatch memory metrics in the target.
-- Exit `143` (SIGTERM) and other non-zero exits from stops outside the excluded prefix list (for example some Fargate task-retirement or platform-update reasons) still match. Extend `excludedStoppedReasonPrefixes` when those events are noise.
-- Health-check replacements (`Task failed ELB health checks`, container health checks) are treated as failures when they produce a non-zero `exitCode`. They are not in the default exclusion set.
+- Exit `143` (SIGTERM) and `TerminationNotice` (task retirement or a platform update) still match. Extend `excludedStopCodes` or `excludedStoppedReasonPrefixes` when those events are noise.
+- Health-check replacements (`Task failed ELB health checks`, container health checks) are treated as failures when they produce a non-zero `exitCode`. They are not in the default exclusion set. Adding `EcsTaskStopCode.SERVICE_SCHEDULER_INITIATED` to `excludedStopCodes` excludes them together with scale-in.
 
 ## Installation
 
@@ -125,9 +139,11 @@ You can also pass `targets` in the constructor (`RuleProps`) instead of calling 
 
 ```typescript
 import {
+  DefaultExcludedStopCodes,
   DefaultExcludedStoppedReasonPrefixes,
   EcsFargateTaskTerminationDetectionEventRule,
   EcsFargateTaskTerminationDetectionMode,
+  EcsTaskStopCode,
 } from 'ecs-fargate-task-termination-detection-event-rule';
 
 // Watch one Fargate service and one task definition revision
@@ -142,6 +158,16 @@ serviceRule.addTarget(new SnsTopic(alertTopic));
 const exitCodeOnlyRule = new EcsFargateTaskTerminationDetectionEventRule(stack, 'ExitCodeOnlyRule', {
   clusterArn,
   detectionMode: EcsFargateTaskTerminationDetectionMode.NON_ZERO_EXIT_CODE,
+});
+
+// Extend the default excluded stop codes.
+// SERVICE_SCHEDULER_INITIATED also drops ELB health-check replacement.
+const extendedStopCodesRule = new EcsFargateTaskTerminationDetectionEventRule(stack, 'ExtendedStopCodesRule', {
+  clusterArn,
+  excludedStopCodes: [
+    ...DefaultExcludedStopCodes.ALL,
+    EcsTaskStopCode.TERMINATION_NOTICE,
+  ],
 });
 
 // Replace the default excluded stoppedReason prefixes
@@ -172,7 +198,8 @@ const extendedExclusionsRule = new EcsFargateTaskTerminationDetectionEventRule(s
 | `group` | No | | Raw ECS task group, matched exactly against `detail.group`. Use this for a non-service group. Must not be empty. Cannot be set together with `serviceName`. |
 | `taskDefinitionArn` | No | | Task definition ARN, matched exactly against `detail.taskDefinitionArn`, including the revision when the event has one. Must not be empty. |
 | `detectionMode` | No | `EcsFargateTaskTerminationDetectionMode.ALL_FAILURES` | `ALL_FAILURES` matches a non-zero `exitCode` or a startup or pull failure. `NON_ZERO_EXIT_CODE` matches only non-zero container exit codes. `TASK_FAILED_TO_START` matches only startup or pull failures. |
-| `excludedStoppedReasonPrefixes` | No | `DefaultExcludedStoppedReasonPrefixes.ALL` | `stoppedReason` prefixes excluded from non-zero exit-code matching. Pass a new array to replace the default set, spread `DefaultExcludedStoppedReasonPrefixes.ALL` to extend it, or pass `[]` to disable exclusion. Must not contain empty strings. Applies only to the non-zero `exitCode` branch. |
+| `excludedStopCodes` | No | `DefaultExcludedStopCodes.ALL` | `stopCode` values excluded from non-zero exit-code matching when the event has a `stopCode`. The default is `UserInitiated` and `SpotInterruption`. Pass a new array to replace the default set, spread `DefaultExcludedStopCodes.ALL` and append `EcsTaskStopCode` values to extend it, or pass `[]` to disable this filter. Must not contain empty strings. |
+| `excludedStoppedReasonPrefixes` | No | `DefaultExcludedStoppedReasonPrefixes.ALL` | `stoppedReason` prefixes excluded from non-zero exit-code matching. Applied together with `excludedStopCodes` when `stopCode` is present, and alone when `stopCode` is absent. Pass a new array to replace the default set, spread `DefaultExcludedStoppedReasonPrefixes.ALL` to extend it, or pass `[]` to disable prefix exclusion. Must not contain empty strings. |
 | Other `RuleProps` | No | | For example `description`, `enabled`, `ruleName`, and `targets`. |
 | `eventPattern` | | | Not supported. The construct always defines its own `eventPattern` and throws if one is provided. |
 

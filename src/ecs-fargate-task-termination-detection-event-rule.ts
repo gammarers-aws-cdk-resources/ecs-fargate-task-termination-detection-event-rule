@@ -53,6 +53,11 @@ const ANYTHING_BUT_FILTER = 'anything-but';
 const PREFIX_FILTER = 'prefix';
 
 /**
+ * EventBridge content filter key that matches whether a field is present.
+ */
+const EXISTS_FILTER = 'exists';
+
+/**
  * EventBridge key that matches when any one of its branches matches.
  */
 const OR_OPERATOR = '$or';
@@ -101,6 +106,11 @@ interface FailureDetailOptions extends ScopeDetailOptions {
   readonly detectionMode: EcsFargateTaskTerminationDetectionMode;
 
   /**
+   * Resolved `stopCode` values excluded from non-zero exit-code matching.
+   */
+  readonly excludedStopCodes: string[];
+
+  /**
    * Resolved `stoppedReason` prefixes excluded from non-zero exit-code matching.
    */
   readonly excludedStoppedReasonPrefixes: string[];
@@ -116,11 +126,35 @@ interface EventPatternOptions extends ScopeDetailOptions {
   readonly detectionMode: EcsFargateTaskTerminationDetectionMode;
 
   /**
+   * `stopCode` values excluded from non-zero exit-code matching, or
+   * `undefined` for {@link DefaultExcludedStopCodes.ALL}.
+   */
+  readonly excludedStopCodes?: string[];
+
+  /**
    * `stoppedReason` prefixes excluded from non-zero exit-code matching, or
    * `undefined` for {@link DefaultExcludedStoppedReasonPrefixes.ALL}.
    */
   readonly excludedStoppedReasonPrefixes?: string[];
 }
+
+/**
+ * Resolves excluded `stopCode` values, defaulting to
+ * {@link DefaultExcludedStopCodes.ALL}.
+ *
+ * @param stopCodes - Caller-supplied codes, or `undefined` for the default set.
+ * @returns Codes to exclude from non-zero exit-code matching.
+ * @throws Error if any code is an empty string.
+ */
+const resolveExcludedStopCodes = (stopCodes: string[] | undefined): string[] => {
+  const resolved = stopCodes ?? [...DefaultExcludedStopCodes.ALL];
+
+  if (resolved.some((stopCode) => stopCode.length === 0)) {
+    throw new Error('excludedStopCodes must not contain empty strings.');
+  }
+
+  return resolved;
+};
 
 /**
  * Resolves excluded `stoppedReason` prefixes, defaulting to
@@ -161,34 +195,81 @@ const buildStoppedReasonExclusion = (
 };
 
 /**
- * `$or` / top-level branch for non-zero container exit codes.
+ * Builds the non-zero exit branches.
  *
- * Scaling and other expected operational stop reasons are excluded in the same
- * branch so EventBridge does not combine a top-level `stoppedReason` filter
- * with `$or` branches that also match on `stoppedReason`.
+ * `stopCode` exclusion is the primary filter. Prefix exclusion stays on the
+ * same branch so scale-in (`ServiceSchedulerInitiated` plus
+ * `Scaling activity initiated by`) stays quiet without also dropping ELB
+ * health-check replacement, which uses that same stop code.
+ *
+ * EventBridge rejects a branch when a filtered field is missing. When stop
+ * codes are excluded, a second branch matches events that omit `stopCode`
+ * and applies only the prefix filter.
  *
  * @param excludedStoppedReasonPrefixes - Prefixes excluded via `anything-but`.
- * @returns Event pattern fragment for non-zero `exitCode` matching.
+ * @param excludedStopCodes - Stop codes excluded via `anything-but`.
+ * @returns One branch when no stop code is excluded, otherwise two.
  */
-const buildNonZeroExitCodeCondition = (
+const buildNonZeroExitBranches = (
   excludedStoppedReasonPrefixes: string[],
-): Record<string, unknown> => {
-  const condition: Record<string, unknown> = {
+  excludedStopCodes: string[],
+): Record<string, unknown>[] => {
+  const containers = {
     containers: {
       exitCode: [
         { [ANYTHING_BUT_FILTER]: SUCCESSFUL_CONTAINER_EXIT_CODE },
       ],
     },
   };
-
   const stoppedReasonExclusion = buildStoppedReasonExclusion(excludedStoppedReasonPrefixes);
-  if (!stoppedReasonExclusion) {
-    return condition;
+  const stoppedReason = stoppedReasonExclusion === undefined
+    ? {}
+    : { stoppedReason: [stoppedReasonExclusion] };
+  const withStopCode: Record<string, unknown> = {
+    ...containers,
+    ...stoppedReason,
+  };
+
+  if (excludedStopCodes.length === 0) {
+    return [withStopCode];
+  }
+
+  return [
+    {
+      ...withStopCode,
+      stopCode: [{ [ANYTHING_BUT_FILTER]: [...excludedStopCodes] }],
+    },
+    {
+      ...containers,
+      stopCode: [{ [EXISTS_FILTER]: false }],
+      ...stoppedReason,
+    },
+  ];
+};
+
+/**
+ * Merges failure branches into the shared scope fields.
+ *
+ * A single branch is inlined. Several branches become `$or`.
+ *
+ * @param base - Scope fields shared by every branch.
+ * @param branches - Failure branches.
+ * @returns The `detail` object.
+ */
+const attachBranches = (
+  base: Record<string, unknown>,
+  branches: readonly Record<string, unknown>[],
+): Record<string, unknown> => {
+  if (branches.length === 1) {
+    return {
+      ...base,
+      ...branches[0],
+    };
   }
 
   return {
-    ...condition,
-    stoppedReason: [stoppedReasonExclusion],
+    ...base,
+    [OR_OPERATOR]: [...branches],
   };
 };
 
@@ -319,7 +400,7 @@ const buildScopeDetail = (options: ScopeDetailOptions): Record<string, unknown> 
  * Builds the EventBridge `detail` filter for the selected detection mode.
  *
  * @param options - Cluster ARN, scope filters, detection mode, and the resolved
- *   `stoppedReason` prefixes excluded from non-zero exit-code matching.
+ *   stop-code and `stoppedReason` exclusions.
  * @returns Event pattern `detail` object for the given mode.
  * @throws Error if `options.detectionMode` is unsupported.
  * @throws Error if `options.scope.serviceName` and `options.scope.group` are both set.
@@ -327,31 +408,20 @@ const buildScopeDetail = (options: ScopeDetailOptions): Record<string, unknown> 
  *   `options.scope.serviceName` starts with `service:`.
  */
 const buildFailureDetail = (options: FailureDetailOptions): Record<string, unknown> => {
-  const { detectionMode, excludedStoppedReasonPrefixes } = options;
+  const { detectionMode, excludedStopCodes, excludedStoppedReasonPrefixes } = options;
   const base = buildScopeDetail(options);
+  const exitBranches = buildNonZeroExitBranches(excludedStoppedReasonPrefixes, excludedStopCodes);
 
   if (detectionMode === EcsFargateTaskTerminationDetectionMode.NON_ZERO_EXIT_CODE) {
-    return {
-      ...base,
-      ...buildNonZeroExitCodeCondition(excludedStoppedReasonPrefixes),
-    };
+    return attachBranches(base, exitBranches);
   }
 
   if (detectionMode === EcsFargateTaskTerminationDetectionMode.TASK_FAILED_TO_START) {
-    return {
-      ...base,
-      [OR_OPERATOR]: STARTUP_FAILURE_OR_CONDITIONS,
-    };
+    return attachBranches(base, STARTUP_FAILURE_OR_CONDITIONS);
   }
 
   if (detectionMode === EcsFargateTaskTerminationDetectionMode.ALL_FAILURES) {
-    return {
-      ...base,
-      [OR_OPERATOR]: [
-        buildNonZeroExitCodeCondition(excludedStoppedReasonPrefixes),
-        ...STARTUP_FAILURE_OR_CONDITIONS,
-      ],
-    };
+    return attachBranches(base, [...exitBranches, ...STARTUP_FAILURE_OR_CONDITIONS]);
   }
 
   throw new Error(`Unsupported detectionMode: ${detectionMode}`);
@@ -360,13 +430,14 @@ const buildFailureDetail = (options: FailureDetailOptions): Record<string, unkno
 /**
  * Builds the full EventBridge event pattern for the construct.
  *
- * Resolves the default `stoppedReason` exclusions when
- * `options.excludedStoppedReasonPrefixes` is omitted.
+ * Resolves the default stop-code and `stoppedReason` exclusions when those
+ * options are omitted.
  *
  * @param options - Cluster ARN, scope filters, detection mode, and the optional
- *   `stoppedReason` prefixes to exclude.
+ *   exclusions.
  * @returns Event pattern targeting `aws.ecs` / `ECS Task State Change`.
- * @throws Error if `options.excludedStoppedReasonPrefixes` contains an empty string.
+ * @throws Error if `options.excludedStopCodes` or
+ *   `options.excludedStoppedReasonPrefixes` contains an empty string.
  * @throws Error if `options.scope.serviceName` and `options.scope.group` are both set.
  * @throws Error if a scope value is an empty string, or if
  *   `options.scope.serviceName` starts with `service:`.
@@ -377,6 +448,7 @@ const buildEventPattern = (options: EventPatternOptions): EventPattern => ({
   detailType: [ECS_TASK_STATE_CHANGE_DETAIL_TYPE],
   detail: buildFailureDetail({
     ...options,
+    excludedStopCodes: resolveExcludedStopCodes(options.excludedStopCodes),
     excludedStoppedReasonPrefixes: resolveExcludedStoppedReasonPrefixes(options.excludedStoppedReasonPrefixes),
   }),
 });
@@ -413,8 +485,88 @@ export enum EcsFargateTaskTerminationDetectionMode {
 }
 
 /**
+ * ECS task `stopCode` values published on `ECS Task State Change`.
+ *
+ * These strings are the stable codes ECS writes.
+ */
+export enum EcsTaskStopCode {
+  /**
+   * The task never reached a running container.
+   */
+  TASK_FAILED_TO_START = 'TaskFailedToStart',
+
+  /**
+   * An essential container exited.
+   */
+  ESSENTIAL_CONTAINER_EXITED = 'EssentialContainerExited',
+
+  /**
+   * A user or API call stopped the task.
+   */
+  USER_INITIATED = 'UserInitiated',
+
+  /**
+   * The service scheduler stopped the task.
+   *
+   * Scale-in, rolling replacement, and ELB health-check replacement share this
+   * code. It is not part of {@link DefaultExcludedStopCodes.ALL}.
+   */
+  SERVICE_SCHEDULER_INITIATED = 'ServiceSchedulerInitiated',
+
+  /**
+   * Fargate Spot reclaimed the task.
+   */
+  SPOT_INTERRUPTION = 'SpotInterruption',
+
+  /**
+   * The infrastructure asked the task to stop, such as host retirement or a
+   * platform update. Not part of {@link DefaultExcludedStopCodes.ALL}.
+   */
+  TERMINATION_NOTICE = 'TerminationNotice',
+}
+
+/**
+ * Default `stopCode` values excluded from non-zero exit-code matching.
+ *
+ * `ServiceSchedulerInitiated` is omitted because ELB health-check replacement
+ * uses that code as well as scale-in. Scale-in stays excluded by
+ * {@link DefaultExcludedStoppedReasonPrefixes.SCALING_ACTIVITY_INITIATED_BY}.
+ * `TerminationNotice` is omitted so platform updates and host retirement still match.
+ *
+ * Override via {@link EcsFargateTaskTerminationDetectionEventRuleProps.excludedStopCodes}.
+ * To extend this set, spread {@link DefaultExcludedStopCodes.ALL} and append
+ * {@link EcsTaskStopCode} values.
+ */
+export class DefaultExcludedStopCodes {
+  /**
+   * Console or API stop.
+   */
+  public static readonly USER_INITIATED = EcsTaskStopCode.USER_INITIATED;
+
+  /**
+   * Fargate Spot reclaim.
+   */
+  public static readonly SPOT_INTERRUPTION = EcsTaskStopCode.SPOT_INTERRUPTION;
+
+  /**
+   * All default stop codes, in a stable order.
+   *
+   * Contains {@link DefaultExcludedStopCodes.USER_INITIATED} and
+   * {@link DefaultExcludedStopCodes.SPOT_INTERRUPTION}.
+   */
+  public static readonly ALL: string[] = [
+    DefaultExcludedStopCodes.USER_INITIATED,
+    DefaultExcludedStopCodes.SPOT_INTERRUPTION,
+  ];
+}
+
+/**
  * Default `stoppedReason` prefixes treated as expected operational stops
  * (not unexpected failures) and excluded from non-zero exit-code matching.
+ *
+ * This is the auxiliary filter. It applies together with
+ * {@link DefaultExcludedStopCodes} when `stopCode` is present, and it is the
+ * only operational-stop filter when `stopCode` is absent.
  *
  * Override via {@link EcsFargateTaskTerminationDetectionEventRuleProps.excludedStoppedReasonPrefixes}.
  * To extend this set, spread {@link DefaultExcludedStoppedReasonPrefixes.ALL}
@@ -507,16 +659,36 @@ export interface EcsFargateTaskTerminationDetectionEventRuleProps extends RulePr
   readonly detectionMode?: EcsFargateTaskTerminationDetectionMode;
 
   /**
+   * `stopCode` values excluded from non-zero exit-code matching.
+   *
+   * This is the primary operational-stop filter. It applies when the event
+   * has a `stopCode`. Events with no `stopCode` use
+   * {@link EcsFargateTaskTerminationDetectionEventRuleProps.excludedStoppedReasonPrefixes}
+   * instead. Those prefixes also apply when `stopCode` is present.
+   *
+   * Applies only to the non-zero `exitCode` branch. Startup-failure matching
+   * is unchanged.
+   *
+   * Pass a new array to replace the default set. To extend defaults, spread
+   * {@link DefaultExcludedStopCodes.ALL} and append {@link EcsTaskStopCode} values.
+   * Pass an empty array to disable `stopCode` exclusion.
+   *
+   * @default DefaultExcludedStopCodes.ALL
+   */
+  readonly excludedStopCodes?: string[];
+
+  /**
    * `stoppedReason` prefixes excluded from non-zero exit-code matching via
    * EventBridge `anything-but` prefix matching.
    *
-   * Applies only to the non-zero `exitCode` branch (`NON_ZERO_EXIT_CODE` and
-   * the corresponding `$or` branch of `ALL_FAILURES`). Startup-failure
-   * matching is unchanged.
+   * Auxiliary filter on the non-zero `exitCode` branch. It runs both when
+   * `stopCode` is present and when `stopCode` is absent. Use it for operational
+   * stops that share a `stopCode` with real failures, such as scale-in.
+   * Startup-failure matching is unchanged.
    *
    * Pass a new array to replace the default set. To extend defaults, spread
    * {@link DefaultExcludedStoppedReasonPrefixes.ALL} and append prefixes.
-   * Pass an empty array to disable exclusion.
+   * Pass an empty array to disable prefix exclusion.
    *
    * @default DefaultExcludedStoppedReasonPrefixes.ALL
    */
@@ -534,10 +706,11 @@ export interface EcsFargateTaskTerminationDetectionEventRuleProps extends RulePr
  * / `TaskFailedToStart`). Use {@link EcsFargateTaskTerminationDetectionMode}
  * to narrow the match if needed.
  *
- * Excluded `stoppedReason` prefixes default to
- * {@link DefaultExcludedStoppedReasonPrefixes.ALL} and can be replaced or
- * extended via
- * {@link EcsFargateTaskTerminationDetectionEventRuleProps.excludedStoppedReasonPrefixes}.
+ * User-initiated stops and Fargate Spot interruptions are excluded by
+ * `stopCode` ({@link DefaultExcludedStopCodes.ALL}). Scale-in stays excluded
+ * by the `stoppedReason` prefix `Scaling activity initiated by`, including
+ * when `stopCode` is `ServiceSchedulerInitiated`. Events that omit `stopCode`
+ * use {@link DefaultExcludedStoppedReasonPrefixes.ALL}.
  *
  * This rule defines its own `eventPattern` and does not accept `props.eventPattern`.
  * The pattern is scoped to the given `clusterArn` and to `launchType` `FARGATE`.
@@ -553,7 +726,8 @@ export class EcsFargateTaskTerminationDetectionEventRule extends Rule {
    * @param props - Rule properties including required `clusterArn`.
    * @throws Error if `props.eventPattern` is provided. This construct always
    *   manages its own `eventPattern`.
-   * @throws Error if `props.excludedStoppedReasonPrefixes` contains an empty string.
+   * @throws Error if `props.excludedStopCodes` or `props.excludedStoppedReasonPrefixes`
+   *   contains an empty string.
    * @throws Error if `props.serviceName` and `props.group` are both set.
    * @throws Error if `props.serviceName`, `props.group`, or
    *   `props.taskDefinitionArn` is an empty string.
@@ -565,6 +739,7 @@ export class EcsFargateTaskTerminationDetectionEventRule extends Rule {
       eventPattern: providedEventPattern,
       clusterArn,
       detectionMode = EcsFargateTaskTerminationDetectionMode.ALL_FAILURES,
+      excludedStopCodes,
       excludedStoppedReasonPrefixes,
       serviceName,
       group,
@@ -581,6 +756,7 @@ export class EcsFargateTaskTerminationDetectionEventRule extends Rule {
       eventPattern: buildEventPattern({
         clusterArn,
         detectionMode,
+        excludedStopCodes,
         excludedStoppedReasonPrefixes,
         scope: {
           serviceName,

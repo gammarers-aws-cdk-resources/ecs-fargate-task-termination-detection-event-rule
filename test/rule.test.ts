@@ -1,9 +1,11 @@
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import * as events from 'aws-cdk-lib/aws-events';
 import {
+  DefaultExcludedStopCodes,
   DefaultExcludedStoppedReasonPrefixes,
   EcsFargateTaskTerminationDetectionEventRule,
   EcsFargateTaskTerminationDetectionMode,
+  EcsTaskStopCode,
 } from '../src';
 import { CLUSTER_ARN, SERVICE_NAME, TASK_DEFINITION_ARN, TASK_GROUP } from './fixtures/constants';
 import { RULE_PROPS_CASES } from './fixtures/rule-props';
@@ -29,15 +31,50 @@ const DEFAULT_EXCLUDED_PREFIXES = [
   'Your Spot Task was interrupted',
 ];
 
+const DEFAULT_EXCLUDED_STOP_CODES = [
+  DefaultExcludedStopCodes.USER_INITIATED,
+  DefaultExcludedStopCodes.SPOT_INTERRUPTION,
+];
+
 const EXIT_CODE_CONDITION = {
   containers: {
     exitCode: [{ 'anything-but': 0 }],
   },
 };
 
+const stopCodeExclusion = (codes: string[]): Record<string, unknown> => ({
+  'anything-but': codes,
+});
+
+/**
+ * Builds the non-zero exit branches for the given exclusions.
+ *
+ * @param prefixes - Prefixes excluded from both branches.
+ * @param stopCodes - Stop codes excluded when the event has a `stopCode`.
+ * @returns One branch when `stopCodes` is empty, otherwise the present and absent branches.
+ */
+const exitBranches = (
+  prefixes: string[],
+  stopCodes: string[] = DEFAULT_EXCLUDED_STOP_CODES,
+): Record<string, unknown>[] => {
+  const stoppedReason = prefixes.length === 0
+    ? {}
+    : { stoppedReason: [stoppedReasonExclusion(prefixes)] };
+  const withStopCode = {
+    ...EXIT_CODE_CONDITION,
+    ...stoppedReason,
+  };
+  if (stopCodes.length === 0) {
+    return [withStopCode];
+  }
+  return [
+    { ...withStopCode, stopCode: [stopCodeExclusion(stopCodes)] },
+    { ...EXIT_CODE_CONDITION, stopCode: [{ exists: false }], ...stoppedReason },
+  ];
+};
+
 const DEFAULT_NON_ZERO_EXIT_CODE_CONDITION = {
-  ...EXIT_CODE_CONDITION,
-  stoppedReason: [stoppedReasonExclusion(DEFAULT_EXCLUDED_PREFIXES)],
+  $or: exitBranches(DEFAULT_EXCLUDED_PREFIXES),
 };
 
 const STARTUP_FAILURE_CONDITIONS = [
@@ -51,7 +88,7 @@ const STARTUP_FAILURE_CONDITIONS = [
 ];
 
 const ALL_FAILURES_DETAIL = {
-  $or: [DEFAULT_NON_ZERO_EXIT_CODE_CONDITION, ...STARTUP_FAILURE_CONDITIONS],
+  $or: [...exitBranches(DEFAULT_EXCLUDED_PREFIXES), ...STARTUP_FAILURE_CONDITIONS],
 };
 
 /**
@@ -93,13 +130,17 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
     expectEventPattern(createTemplate(), ALL_FAILURES_DETAIL);
   });
 
-  it('should document the default excluded stoppedReason prefixes', () => {
+  it('should document the default exclusion lists', () => {
     expect(DefaultExcludedStoppedReasonPrefixes.ALL).toEqual([
       DefaultExcludedStoppedReasonPrefixes.SCALING_ACTIVITY_INITIATED_BY,
       DefaultExcludedStoppedReasonPrefixes.TASK_STOPPED_BY_USER,
       DefaultExcludedStoppedReasonPrefixes.SPOT_TASK_INTERRUPTED,
     ]);
     expect(DefaultExcludedStoppedReasonPrefixes.ALL).toEqual(DEFAULT_EXCLUDED_PREFIXES);
+    expect(DefaultExcludedStopCodes.ALL).toEqual([
+      EcsTaskStopCode.USER_INITIATED,
+      EcsTaskStopCode.SPOT_INTERRUPTION,
+    ]);
   });
 
   describe('detectionMode', () => {
@@ -138,7 +179,7 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
         props: { excludedStoppedReasonPrefixes: ['Task stopped by user'] },
         detail: {
           $or: [
-            { ...EXIT_CODE_CONDITION, stoppedReason: [stoppedReasonExclusion(['Task stopped by user'])] },
+            ...exitBranches(['Task stopped by user']),
             ...STARTUP_FAILURE_CONDITIONS,
           ],
         },
@@ -153,12 +194,7 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
         },
         detail: {
           $or: [
-            {
-              ...EXIT_CODE_CONDITION,
-              stoppedReason: [
-                stoppedReasonExclusion([...DEFAULT_EXCLUDED_PREFIXES, 'Task stopped due to a platform version update']),
-              ],
-            },
+            ...exitBranches([...DEFAULT_EXCLUDED_PREFIXES, 'Task stopped due to a platform version update']),
             ...STARTUP_FAILURE_CONDITIONS,
           ],
         },
@@ -169,7 +205,7 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
           detectionMode: EcsFargateTaskTerminationDetectionMode.NON_ZERO_EXIT_CODE,
           excludedStoppedReasonPrefixes: [],
         },
-        detail: EXIT_CODE_CONDITION,
+        detail: { $or: exitBranches([]) },
       },
     ])('should $name', ({ props, detail }) => {
       expectEventPattern(createTemplate(props), detail);
@@ -223,7 +259,7 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
         detail: {
           group: [SERVICE_GROUP],
           $or: [
-            { ...EXIT_CODE_CONDITION, stoppedReason: [stoppedReasonExclusion(['Task stopped by user'])] },
+            ...exitBranches(['Task stopped by user']),
             ...STARTUP_FAILURE_CONDITIONS,
           ],
         },
@@ -256,6 +292,52 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
       }).toThrow(
         'serviceName must be the ECS service name without the "service:" prefix. Use group to match a raw task group.',
       );
+    });
+  });
+
+  describe('excludedStopCodes', () => {
+    it.each([
+      {
+        name: 'replace the default stop codes',
+        props: { excludedStopCodes: [EcsTaskStopCode.USER_INITIATED] },
+        detail: {
+          $or: [
+            ...exitBranches(DEFAULT_EXCLUDED_PREFIXES, [EcsTaskStopCode.USER_INITIATED]),
+            ...STARTUP_FAILURE_CONDITIONS,
+          ],
+        },
+      },
+      {
+        name: 'extend the default stop codes',
+        props: {
+          excludedStopCodes: [...DefaultExcludedStopCodes.ALL, EcsTaskStopCode.TERMINATION_NOTICE],
+        },
+        detail: {
+          $or: [
+            ...exitBranches(DEFAULT_EXCLUDED_PREFIXES, [
+              ...DEFAULT_EXCLUDED_STOP_CODES,
+              EcsTaskStopCode.TERMINATION_NOTICE,
+            ]),
+            ...STARTUP_FAILURE_CONDITIONS,
+          ],
+        },
+      },
+      {
+        name: 'omit the stopCode exclusion when the array is empty',
+        props: {
+          detectionMode: EcsFargateTaskTerminationDetectionMode.NON_ZERO_EXIT_CODE,
+          excludedStopCodes: [],
+        },
+        detail: exitBranches(DEFAULT_EXCLUDED_PREFIXES, [])[0],
+      },
+    ])('should $name', ({ props, detail }) => {
+      expectEventPattern(createTemplate(props), detail);
+    });
+
+    it('should throw when it contains an empty string', () => {
+      expect(() => {
+        createTemplate({ excludedStopCodes: [EcsTaskStopCode.USER_INITIATED, ''] });
+      }).toThrow('excludedStopCodes must not contain empty strings.');
     });
   });
 

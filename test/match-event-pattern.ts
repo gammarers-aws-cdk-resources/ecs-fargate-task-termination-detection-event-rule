@@ -2,7 +2,8 @@
  * Subset of EventBridge pattern matching used by this construct's rule.
  *
  * Covers exact values, arrays (any element), `prefix`, `anything-but`,
- * `anything-but` prefix lists, nested objects, and one `$or`.
+ * `anything-but` value lists, `anything-but` prefix lists, `exists`,
+ * nested objects, and one `$or`.
  *
  * Like EventBridge, every leaf value in the pattern must be an array. A bare
  * primitive makes the matcher throw.
@@ -19,6 +20,11 @@ const ANYTHING_BUT_FILTER = 'anything-but';
 const PREFIX_FILTER = 'prefix';
 
 /**
+ * Content filter key that matches whether a field is present.
+ */
+const EXISTS_FILTER = 'exists';
+
+/**
  * Key that matches when any one of its branches matches.
  */
 const OR_OPERATOR = '$or';
@@ -26,7 +32,7 @@ const OR_OPERATOR = '$or';
 /**
  * Keys that mark an object as a content filter instead of a nested pattern.
  */
-const FILTER_KEYS = new Set([PREFIX_FILTER, ANYTHING_BUT_FILTER]);
+const FILTER_KEYS = new Set([PREFIX_FILTER, ANYTHING_BUT_FILTER, EXISTS_FILTER]);
 
 /**
  * Returns whether `value` is a plain object (not `null` and not an array).
@@ -75,7 +81,7 @@ const readStringList = (value: unknown): string[] | undefined => {
  * Returns whether `eventValue` fails an `anything-but` matcher.
  *
  * A `{ prefix }` matcher excludes strings that start with any listed prefix.
- * Any other matcher excludes an exact value.
+ * An array excludes each exact value. Any other matcher excludes one exact value.
  *
  * @param eventValue - Value taken from the event.
  * @param matcher - EventBridge `anything-but` payload.
@@ -87,17 +93,43 @@ const matchesAnythingBut = (eventValue: unknown, matcher: unknown): boolean => {
     return typeof eventValue === 'string' && prefixes.every((prefix) => !eventValue.startsWith(prefix));
   }
 
+  if (Array.isArray(matcher)) {
+    return matcher.every((excluded) => excluded !== eventValue);
+  }
+
   return eventValue !== matcher;
+};
+
+/**
+ * Returns whether a missing field satisfies `pattern`.
+ *
+ * Only `{ exists: false }` matches a field the event omits.
+ *
+ * @param pattern - Pattern value for the missing field.
+ * @returns `true` when the missing field is accepted.
+ */
+const matchesMissingField = (pattern: unknown): boolean => {
+  if (!Array.isArray(pattern)) {
+    return false;
+  }
+
+  return pattern.some((item) => {
+    return isRecord(item) && Object.keys(item).length === 1 && item[EXISTS_FILTER] === false;
+  });
 };
 
 /**
  * Returns whether `eventValue` satisfies one content filter.
  *
  * @param eventValue - Value taken from the event.
- * @param filter - `prefix` or `anything-but` filter object.
+ * @param filter - `prefix`, `anything-but`, or `exists` filter object. The field is present.
  * @returns `true` when the filter matches.
  */
 const matchesFilter = (eventValue: unknown, filter: Record<string, unknown>): boolean => {
+  if (EXISTS_FILTER in filter) {
+    return filter[EXISTS_FILTER] === true;
+  }
+
   if (ANYTHING_BUT_FILTER in filter) {
     return matchesAnythingBut(eventValue, filter[ANYTHING_BUT_FILTER]);
   }
@@ -127,7 +159,7 @@ const matchesObjectFields = (eventValue: unknown, pattern: Record<string, unknow
       return true;
     }
     if (!(key in eventValue)) {
-      return false;
+      return matchesMissingField(fieldPattern);
     }
     return matchesValue(eventValue[key], fieldPattern);
   });

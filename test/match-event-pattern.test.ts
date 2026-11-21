@@ -10,6 +10,32 @@ describe('event pattern matching guards', () => {
     expect(matched).toBe(true);
   });
 
+  it('excludes every value in an anything-but list', () => {
+    const matched = eventMatchesPattern(
+      { stopCode: 'UserInitiated' },
+      { stopCode: [{ 'anything-but': ['UserInitiated', 'SpotInterruption'] }] },
+    );
+
+    expect(matched).toBe(false);
+  });
+
+  it('matches a value that is outside an anything-but list', () => {
+    const matched = eventMatchesPattern(
+      { exitCode: 1 },
+      { exitCode: [{ 'anything-but': [0, 143] }] },
+    );
+
+    expect(matched).toBe(true);
+  });
+
+  it('matches a missing field only for exists false', () => {
+    expect(eventMatchesPattern({}, { stopCode: [{ exists: false }] })).toBe(true);
+    expect(eventMatchesPattern({ stopCode: 'UserInitiated' }, { stopCode: [{ exists: false }] })).toBe(false);
+    expect(eventMatchesPattern({ stopCode: 'UserInitiated' }, { stopCode: [{ exists: true }] })).toBe(true);
+    expect(eventMatchesPattern({}, { stopCode: [{ exists: true }] })).toBe(false);
+    expect(eventMatchesPattern({}, { stopCode: ['UserInitiated'] })).toBe(false);
+  });
+
   it('does not treat a mixed anything-but prefix list as prefixes', () => {
     const matched = eventMatchesPattern(
       { reason: 'CannotPullContainerError: denied' },

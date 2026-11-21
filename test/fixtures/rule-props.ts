@@ -1,8 +1,10 @@
 import { SERVICE_NAME, TASK_DEFINITION_ARN, TASK_GROUP } from './constants';
 import {
+  DefaultExcludedStopCodes,
   DefaultExcludedStoppedReasonPrefixes,
   EcsFargateTaskTerminationDetectionEventRuleProps,
   EcsFargateTaskTerminationDetectionMode,
+  EcsTaskStopCode,
 } from '../../src';
 
 /**
@@ -48,6 +50,16 @@ export const RULE_PROPS_CASES: RulePropsCase[] = [
     name: 'extended excluded stoppedReason prefixes',
     props: {
       excludedStoppedReasonPrefixes: [...DefaultExcludedStoppedReasonPrefixes.ALL, 'Custom reason'],
+    },
+  },
+  {
+    name: 'replaced excluded stop codes',
+    props: { excludedStopCodes: [EcsTaskStopCode.USER_INITIATED] },
+  },
+  {
+    name: 'extended excluded stop codes',
+    props: {
+      excludedStopCodes: [...DefaultExcludedStopCodes.ALL, EcsTaskStopCode.TERMINATION_NOTICE],
     },
   },
 ];

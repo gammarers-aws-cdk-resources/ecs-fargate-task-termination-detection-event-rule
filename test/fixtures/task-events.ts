@@ -173,4 +173,52 @@ export const TASK_EVENT_CASES: TaskEventCase[] = [
     }),
     expectation: 'miss',
   },
+  {
+    name: 'ignores a user stop whose wording is outside the default prefixes',
+    rule: 'default',
+    event: taskEvent({
+      containers: [{ name: 'app', exitCode: 143 }],
+      stoppedReason: 'Stopped by operator',
+      stopCode: 'UserInitiated',
+    }),
+    expectation: 'miss',
+  },
+  {
+    name: 'matches an ELB health-check stop',
+    rule: 'default',
+    event: taskEvent({
+      containers: [{ name: 'app', exitCode: 143 }],
+      stoppedReason: 'Task failed ELB health checks in (target-group arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/example/abc)',
+      stopCode: 'ServiceSchedulerInitiated',
+    }),
+    expectation: 'match',
+  },
+  {
+    name: 'matches a termination notice with a non-zero exit',
+    rule: 'default',
+    event: taskEvent({
+      containers: [{ name: 'app', exitCode: 143 }],
+      stoppedReason: 'Task stopped due to a platform version update',
+      stopCode: 'TerminationNotice',
+    }),
+    expectation: 'match',
+  },
+  {
+    name: 'ignores a user-stop prefix when stopCode is absent',
+    rule: 'default',
+    event: taskEvent({
+      containers: [{ name: 'app', exitCode: 143 }],
+      stoppedReason: 'Task stopped by user',
+    }),
+    expectation: 'miss',
+  },
+  {
+    name: 'matches a non-zero exit when stopCode is absent',
+    rule: 'default',
+    event: taskEvent({
+      containers: [{ name: 'app', exitCode: 1 }],
+      stoppedReason: 'Essential container in task exited',
+    }),
+    expectation: 'match',
+  },
 ];
