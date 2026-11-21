@@ -1,12 +1,16 @@
-import { SERVICE_NAME, TASK_DEFINITION_ARN, TASK_GROUP } from './constants';
+import { CLUSTER_ARN, OTHER_CLUSTER_ARN, SERVICE_NAME, TASK_DEFINITION_ARN, TASK_GROUP } from './constants';
+import { type SampleRule } from './task-events';
 import {
+  DefaultExcludedStopCodes,
   DefaultExcludedStoppedReasonPrefixes,
+  DefaultStartupFailureStoppedReasonPrefixes,
   EcsFargateTaskTerminationDetectionEventRuleProps,
   EcsFargateTaskTerminationDetectionMode,
+  EcsTaskStopCode,
 } from '../../src';
 
 /**
- * Rule props other than `clusterArn`, which every sample rule fixes.
+ * Rule props other than the cluster input `createTemplate` fills in.
  */
 export type RuleSampleProps = Omit<EcsFargateTaskTerminationDetectionEventRuleProps, 'clusterArn'>;
 
@@ -50,4 +54,37 @@ export const RULE_PROPS_CASES: RulePropsCase[] = [
       excludedStoppedReasonPrefixes: [...DefaultExcludedStoppedReasonPrefixes.ALL, 'Custom reason'],
     },
   },
+  {
+    name: 'replaced excluded stop codes',
+    props: { excludedStopCodes: [EcsTaskStopCode.USER_INITIATED] },
+  },
+  {
+    name: 'extended excluded stop codes',
+    props: {
+      excludedStopCodes: [...DefaultExcludedStopCodes.ALL, EcsTaskStopCode.TERMINATION_NOTICE],
+    },
+  },
+  {
+    name: 'extended startup failure prefixes',
+    props: {
+      startupFailureStoppedReasonPrefixes: [...DefaultStartupFailureStoppedReasonPrefixes.ALL, 'Custom startup failure'],
+    },
+  },
+  { name: 'no startup failure prefixes', props: { startupFailureStoppedReasonPrefixes: [] } },
+  { name: 'clusterArns', props: { clusterArns: [CLUSTER_ARN, OTHER_CLUSTER_ARN] } },
+  { name: 'serviceNames', props: { serviceNames: [SERVICE_NAME, 'example-worker'] } },
+  { name: 'ignoredExitCodes', props: { ignoredExitCodes: [143] } },
+  { name: 'containerNames', props: { containerNames: ['app'] } },
 ];
+
+/**
+ * Props for the sample rules shared by the unit tests and the integration tests.
+ *
+ * `createTemplate` adds `clusterArn` when a case does not set a cluster.
+ */
+export const SAMPLE_RULES: Record<SampleRule, RuleSampleProps> = {
+  default: {},
+  service: { serviceName: SERVICE_NAME },
+  ignoredExit: { ignoredExitCodes: [143] },
+  containerName: { containerNames: ['app'] },
+};

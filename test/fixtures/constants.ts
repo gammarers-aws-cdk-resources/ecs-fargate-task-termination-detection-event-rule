@@ -19,6 +19,11 @@ export const TEST_REGION = 'us-east-1';
 export const CLUSTER_ARN = `arn:aws:ecs:${TEST_REGION}:${TEST_ACCOUNT_ID}:cluster/example-app-cluster`;
 
 /**
+ * Cluster other than {@link CLUSTER_ARN}, used to check multi-cluster scope.
+ */
+export const OTHER_CLUSTER_ARN = `arn:aws:ecs:${TEST_REGION}:${TEST_ACCOUNT_ID}:cluster/other`;
+
+/**
  * Service name used by the `service` sample rule.
  */
 export const SERVICE_NAME = 'example-api';

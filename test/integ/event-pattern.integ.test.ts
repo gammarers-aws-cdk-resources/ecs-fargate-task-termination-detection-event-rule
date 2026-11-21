@@ -10,10 +10,10 @@
  * `AWS_DEFAULT_REGION`, or the shared AWS config file.
  */
 import { EventBridgeClient, TestEventPatternCommand } from '@aws-sdk/client-eventbridge';
-import { CLUSTER_ARN, SERVICE_NAME, TEST_ACCOUNT_ID, TEST_REGION } from '../fixtures/constants';
-import { RULE_PROPS_CASES } from '../fixtures/rule-props';
+import { CLUSTER_ARN, TEST_ACCOUNT_ID, TEST_REGION } from '../fixtures/constants';
+import { RULE_PROPS_CASES, SAMPLE_RULES } from '../fixtures/rule-props';
 import { createTemplate } from '../fixtures/synthesize';
-import { TASK_EVENT_CASES } from '../fixtures/task-events';
+import { type SampleRule, TASK_EVENT_CASES } from '../fixtures/task-events';
 import { eventMatchesPattern, readEventPattern } from '../match-event-pattern';
 
 /**
@@ -79,38 +79,37 @@ const matchesOnEventBridge = async (
   return output.Result === true;
 };
 
-const sampleRulePatterns = {
-  default: readEventPattern(createTemplate().toJSON()),
-  service: readEventPattern(createTemplate({ serviceName: SERVICE_NAME }).toJSON()),
-};
+const sampleRulePatterns = Object.fromEntries(
+  (Object.entries(SAMPLE_RULES) as [SampleRule, (typeof SAMPLE_RULES)[SampleRule]][]).map(([name, props]) => {
+    return [name, readEventPattern(createTemplate(props).toJSON())];
+  }),
+) as Record<SampleRule, Record<string, unknown>>;
 
-describe('EventBridge TestEventPattern', () => {
-  describe('pattern validity', () => {
-    it.each(RULE_PROPS_CASES)('accepts the pattern for $name', async ({ props }) => {
-      const pattern = readEventPattern(createTemplate(props).toJSON());
+describe('pattern validity', () => {
+  it.each(RULE_PROPS_CASES)('accepts the pattern for $name', async ({ props }) => {
+    const pattern = readEventPattern(createTemplate(props).toJSON());
 
-      await expect(matchesOnEventBridge(pattern, TASK_EVENT_CASES[0].event))
-        .resolves.toEqual(expect.any(Boolean));
-    });
-
-    // Guards the original bug: a leaf value must be an array.
-    it('rejects a leaf value that is not an array', async () => {
-      const pattern = { detail: { clusterArn: CLUSTER_ARN } };
-
-      await expect(matchesOnEventBridge(pattern, TASK_EVENT_CASES[0].event))
-        .rejects.toMatchObject({ name: INVALID_EVENT_PATTERN_EXCEPTION });
-    });
+    await expect(matchesOnEventBridge(pattern, TASK_EVENT_CASES[0].event))
+      .resolves.toEqual(expect.any(Boolean));
   });
 
-  describe('match results', () => {
-    it.each(TASK_EVENT_CASES)('$name', async ({ rule, event, expectation }) => {
-      const pattern = sampleRulePatterns[rule];
+  // Guards the original bug: a leaf value must be an array.
+  it('rejects a leaf value that is not an array', async () => {
+    const pattern = { detail: { clusterArn: CLUSTER_ARN } };
 
-      const matchedOnEventBridge = await matchesOnEventBridge(pattern, event);
+    await expect(matchesOnEventBridge(pattern, TASK_EVENT_CASES[0].event))
+      .rejects.toMatchObject({ name: INVALID_EVENT_PATTERN_EXCEPTION });
+  });
+});
 
-      expect(matchedOnEventBridge).toBe(expectation === 'match');
-      // The unit tests rely on this matcher, so it must agree with EventBridge.
-      expect(eventMatchesPattern(event, pattern)).toBe(matchedOnEventBridge);
-    });
+describe('match results', () => {
+  it.each(TASK_EVENT_CASES)('$name', async ({ rule, event, expectation }) => {
+    const pattern = sampleRulePatterns[rule];
+
+    const matchedOnEventBridge = await matchesOnEventBridge(pattern, event);
+
+    expect(matchedOnEventBridge).toBe(expectation === 'match');
+    // The unit tests rely on this matcher, so it must agree with EventBridge.
+    expect(eventMatchesPattern(event, pattern)).toBe(matchedOnEventBridge);
   });
 });

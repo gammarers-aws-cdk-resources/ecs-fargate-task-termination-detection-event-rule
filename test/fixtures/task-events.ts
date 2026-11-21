@@ -2,20 +2,17 @@
  * ECS task state change events shared by the unit tests and the integration
  * tests, so both check the same cases.
  */
-import { CLUSTER_ARN, SERVICE_NAME, TEST_ACCOUNT_ID, TEST_REGION } from './constants';
-
-/**
- * Cluster other than {@link CLUSTER_ARN}, used to check the cluster scope.
- */
-const OTHER_CLUSTER_ARN = `arn:aws:ecs:${TEST_REGION}:${TEST_ACCOUNT_ID}:cluster/other`;
+import { CLUSTER_ARN, OTHER_CLUSTER_ARN, SERVICE_NAME } from './constants';
 
 /**
  * Sample rule an event is checked against.
  *
  * - `default`: every Fargate task in {@link CLUSTER_ARN}.
  * - `service`: only the service named {@link SERVICE_NAME}.
+ * - `ignoredExit`: `default`, plus exit code 143 ignored.
+ * - `containerName`: `default`, limited to the `app` container.
  */
-export type SampleRule = 'default' | 'service';
+export type SampleRule = 'default' | 'service' | 'ignoredExit' | 'containerName';
 
 /**
  * Whether the rule should match the event.
@@ -172,5 +169,151 @@ export const TASK_EVENT_CASES: TaskEventCase[] = [
       stoppedReason: 'Essential container in task exited',
     }),
     expectation: 'miss',
+  },
+  {
+    name: 'ignores a user stop whose wording is outside the default prefixes',
+    rule: 'default',
+    event: taskEvent({
+      containers: [{ name: 'app', exitCode: 143 }],
+      stoppedReason: 'Stopped by operator',
+      stopCode: 'UserInitiated',
+    }),
+    expectation: 'miss',
+  },
+  {
+    name: 'matches an ELB health-check stop',
+    rule: 'default',
+    event: taskEvent({
+      containers: [{ name: 'app', exitCode: 143 }],
+      stoppedReason: 'Task failed ELB health checks in (target-group arn:aws:elasticloadbalancing:us-east-1:123456789012:targetgroup/example/abc)',
+      stopCode: 'ServiceSchedulerInitiated',
+    }),
+    expectation: 'match',
+  },
+  {
+    name: 'matches a termination notice with a non-zero exit',
+    rule: 'default',
+    event: taskEvent({
+      containers: [{ name: 'app', exitCode: 143 }],
+      stoppedReason: 'Task stopped due to a platform version update',
+      stopCode: 'TerminationNotice',
+    }),
+    expectation: 'match',
+  },
+  {
+    name: 'ignores a user-stop prefix when stopCode is absent',
+    rule: 'default',
+    event: taskEvent({
+      containers: [{ name: 'app', exitCode: 143 }],
+      stoppedReason: 'Task stopped by user',
+    }),
+    expectation: 'miss',
+  },
+  {
+    name: 'matches CannotStartContainerError when stopCode is absent',
+    rule: 'default',
+    event: taskEvent({
+      stoppedReason: 'CannotStartContainerError: Error response from daemon',
+    }),
+    expectation: 'match',
+  },
+  {
+    name: 'matches a task failed to start reason when stopCode is absent',
+    rule: 'default',
+    event: taskEvent({
+      stoppedReason: 'Task failed to start',
+    }),
+    expectation: 'match',
+  },
+  {
+    name: 'ignores a pull error when stopCode is not TaskFailedToStart',
+    rule: 'default',
+    event: taskEvent({
+      stoppedReason: 'CannotPullContainerError: pull access denied',
+      stopCode: 'EssentialContainerExited',
+    }),
+    expectation: 'miss',
+  },
+  {
+    name: 'ignores an exit code listed in ignoredExitCodes',
+    rule: 'ignoredExit',
+    event: taskEvent({
+      containers: [{ name: 'app', exitCode: 143 }],
+      stoppedReason: 'Essential container in task exited',
+      stopCode: 'EssentialContainerExited',
+    }),
+    expectation: 'miss',
+  },
+  {
+    name: 'matches another non-zero exit when one code is ignored',
+    rule: 'ignoredExit',
+    event: taskEvent({
+      containers: [{ name: 'app', exitCode: 1 }],
+      stoppedReason: 'Essential container in task exited',
+      stopCode: 'EssentialContainerExited',
+    }),
+    expectation: 'match',
+  },
+  {
+    name: 'still matches TaskFailedToStart when the exit code is ignored',
+    rule: 'ignoredExit',
+    event: taskEvent({
+      containers: [{ name: 'app', exitCode: 143 }],
+      stopCode: 'TaskFailedToStart',
+    }),
+    expectation: 'match',
+  },
+  {
+    name: 'matches the named container exit',
+    rule: 'containerName',
+    event: taskEvent({
+      containers: [
+        { name: 'sidecar', exitCode: 0 },
+        { name: 'app', exitCode: 1 },
+      ],
+      stoppedReason: 'Essential container in task exited',
+      stopCode: 'EssentialContainerExited',
+    }),
+    expectation: 'match',
+  },
+  {
+    name: 'ignores a sidecar exit when containerNames is set',
+    rule: 'containerName',
+    event: taskEvent({
+      containers: [
+        { name: 'sidecar', exitCode: 1 },
+        { name: 'app', exitCode: 0 },
+      ],
+      stoppedReason: 'Essential container in task exited',
+      stopCode: 'EssentialContainerExited',
+    }),
+    expectation: 'miss',
+  },
+  {
+    name: 'matches a startup failure for the named container',
+    rule: 'containerName',
+    event: taskEvent({
+      containers: [{ name: 'app' }],
+      stopCode: 'TaskFailedToStart',
+    }),
+    expectation: 'match',
+  },
+  {
+    name: 'ignores a startup failure for another container',
+    rule: 'containerName',
+    event: taskEvent({
+      containers: [{ name: 'sidecar' }],
+      stoppedReason: 'CannotPullContainerError: pull access denied',
+    }),
+    expectation: 'miss',
+  },
+  {
+    name: 'matches a non-zero exit when stopCode is absent',
+    rule: 'default',
+    event: taskEvent({
+      containers: [{ name: 'app', exitCode: 1 }],
+      stoppedReason: 'Essential container in task exited',
+    }),
+    expectation: 'match',
   },
 ];

@@ -1,6 +1,6 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for ALL_FAILURES 1`] = `
+exports[`snapshots should match the snapshot for ALL_FAILURES 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -23,6 +23,39 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                     },
                   ],
                 },
+                "stopCode": [
+                  {
+                    "anything-but": [
+                      "UserInitiated",
+                      "SpotInterruption",
+                    ],
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "anything-but": {
@@ -41,179 +74,23 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                 ],
               },
               {
-                "stoppedReason": [
-                  {
-                    "prefix": "CannotPullContainerError",
-                  },
-                  {
-                    "prefix": "ResourceInitializationError",
-                  },
-                ],
-              },
-            ],
-            "clusterArn": [
-              "arn:aws:ecs:us-east-1:123456789012:cluster/example-app-cluster",
-            ],
-            "lastStatus": [
-              "STOPPED",
-            ],
-            "launchType": [
-              "FARGATE",
-            ],
-          },
-          "detail-type": [
-            "ECS Task State Change",
-          ],
-          "source": [
-            "aws.ecs",
-          ],
-        },
-        "State": "ENABLED",
-      },
-      "Type": "AWS::Events::Rule",
-    },
-  },
-  "Rules": {
-    "CheckBootstrapVersion": {
-      "Assertions": [
-        {
-          "Assert": {
-            "Fn::Not": [
-              {
-                "Fn::Contains": [
-                  [
-                    "1",
-                    "2",
-                    "3",
-                    "4",
-                    "5",
-                  ],
-                  {
-                    "Ref": "BootstrapVersion",
-                  },
-                ],
-              },
-            ],
-          },
-          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
-        },
-      ],
-    },
-  },
-}
-`;
-
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for NON_ZERO_EXIT_CODE 1`] = `
-{
-  "Parameters": {
-    "BootstrapVersion": {
-      "Default": "/cdk-bootstrap/hnb659fds/version",
-      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
-      "Type": "AWS::SSM::Parameter::Value<String>",
-    },
-  },
-  "Resources": {
-    "Rule4C995B7F": {
-      "Properties": {
-        "EventPattern": {
-          "detail": {
-            "clusterArn": [
-              "arn:aws:ecs:us-east-1:123456789012:cluster/example-app-cluster",
-            ],
-            "containers": {
-              "exitCode": [
-                {
-                  "anything-but": 0,
-                },
-              ],
-            },
-            "lastStatus": [
-              "STOPPED",
-            ],
-            "launchType": [
-              "FARGATE",
-            ],
-            "stoppedReason": [
-              {
-                "anything-but": {
-                  "prefix": [
-                    "Scaling activity initiated by",
-                    "Task stopped by user",
-                    "Your Spot Task was interrupted",
-                  ],
-                },
-              },
-            ],
-          },
-          "detail-type": [
-            "ECS Task State Change",
-          ],
-          "source": [
-            "aws.ecs",
-          ],
-        },
-        "State": "ENABLED",
-      },
-      "Type": "AWS::Events::Rule",
-    },
-  },
-  "Rules": {
-    "CheckBootstrapVersion": {
-      "Assertions": [
-        {
-          "Assert": {
-            "Fn::Not": [
-              {
-                "Fn::Contains": [
-                  [
-                    "1",
-                    "2",
-                    "3",
-                    "4",
-                    "5",
-                  ],
-                  {
-                    "Ref": "BootstrapVersion",
-                  },
-                ],
-              },
-            ],
-          },
-          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
-        },
-      ],
-    },
-  },
-}
-`;
-
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for TASK_FAILED_TO_START 1`] = `
-{
-  "Parameters": {
-    "BootstrapVersion": {
-      "Default": "/cdk-bootstrap/hnb659fds/version",
-      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
-      "Type": "AWS::SSM::Parameter::Value<String>",
-    },
-  },
-  "Resources": {
-    "Rule4C995B7F": {
-      "Properties": {
-        "EventPattern": {
-          "detail": {
-            "$or": [
-              {
                 "stopCode": [
-                  "TaskFailedToStart",
+                  {
+                    "exists": false,
+                  },
                 ],
-              },
-              {
                 "stoppedReason": [
                   {
                     "prefix": "CannotPullContainerError",
                   },
                   {
                     "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
                   },
                 ],
               },
@@ -270,7 +147,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for defaults 1`] = `
+exports[`snapshots should match the snapshot for NON_ZERO_EXIT_CODE 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -293,6 +170,254 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                     },
                   ],
                 },
+                "stopCode": [
+                  {
+                    "anything-but": [
+                      "UserInitiated",
+                      "SpotInterruption",
+                    ],
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+            ],
+            "clusterArn": [
+              "arn:aws:ecs:us-east-1:123456789012:cluster/example-app-cluster",
+            ],
+            "lastStatus": [
+              "STOPPED",
+            ],
+            "launchType": [
+              "FARGATE",
+            ],
+          },
+          "detail-type": [
+            "ECS Task State Change",
+          ],
+          "source": [
+            "aws.ecs",
+          ],
+        },
+        "State": "ENABLED",
+      },
+      "Type": "AWS::Events::Rule",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`snapshots should match the snapshot for TASK_FAILED_TO_START 1`] = `
+{
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "Rule4C995B7F": {
+      "Properties": {
+        "EventPattern": {
+          "detail": {
+            "$or": [
+              {
+                "stopCode": [
+                  "TaskFailedToStart",
+                ],
+              },
+              {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "prefix": "CannotPullContainerError",
+                  },
+                  {
+                    "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
+                  },
+                ],
+              },
+            ],
+            "clusterArn": [
+              "arn:aws:ecs:us-east-1:123456789012:cluster/example-app-cluster",
+            ],
+            "lastStatus": [
+              "STOPPED",
+            ],
+            "launchType": [
+              "FARGATE",
+            ],
+          },
+          "detail-type": [
+            "ECS Task State Change",
+          ],
+          "source": [
+            "aws.ecs",
+          ],
+        },
+        "State": "ENABLED",
+      },
+      "Type": "AWS::Events::Rule",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`snapshots should match the snapshot for clusterArns 1`] = `
+{
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "Rule4C995B7F": {
+      "Properties": {
+        "EventPattern": {
+          "detail": {
+            "$or": [
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "anything-but": [
+                      "UserInitiated",
+                      "SpotInterruption",
+                    ],
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "anything-but": {
@@ -311,12 +436,187 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                 ],
               },
               {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "prefix": "CannotPullContainerError",
                   },
                   {
                     "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
+                  },
+                ],
+              },
+            ],
+            "clusterArn": [
+              "arn:aws:ecs:us-east-1:123456789012:cluster/example-app-cluster",
+              "arn:aws:ecs:us-east-1:123456789012:cluster/other",
+            ],
+            "lastStatus": [
+              "STOPPED",
+            ],
+            "launchType": [
+              "FARGATE",
+            ],
+          },
+          "detail-type": [
+            "ECS Task State Change",
+          ],
+          "source": [
+            "aws.ecs",
+          ],
+        },
+        "State": "ENABLED",
+      },
+      "Type": "AWS::Events::Rule",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`snapshots should match the snapshot for containerNames 1`] = `
+{
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "Rule4C995B7F": {
+      "Properties": {
+        "EventPattern": {
+          "detail": {
+            "$or": [
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                  "name": [
+                    "app",
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "anything-but": [
+                      "UserInitiated",
+                      "SpotInterruption",
+                    ],
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                  "name": [
+                    "app",
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "containers": {
+                  "name": [
+                    "app",
+                  ],
+                },
+                "stopCode": [
+                  "TaskFailedToStart",
+                ],
+              },
+              {
+                "containers": {
+                  "name": [
+                    "app",
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "prefix": "CannotPullContainerError",
+                  },
+                  {
+                    "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
                   },
                 ],
               },
@@ -373,7 +673,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for extended excluded stoppedReason prefixes 1`] = `
+exports[`snapshots should match the snapshot for defaults 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -396,6 +696,335 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                     },
                   ],
                 },
+                "stopCode": [
+                  {
+                    "anything-but": [
+                      "UserInitiated",
+                      "SpotInterruption",
+                    ],
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "stopCode": [
+                  "TaskFailedToStart",
+                ],
+              },
+              {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "prefix": "CannotPullContainerError",
+                  },
+                  {
+                    "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
+                  },
+                ],
+              },
+            ],
+            "clusterArn": [
+              "arn:aws:ecs:us-east-1:123456789012:cluster/example-app-cluster",
+            ],
+            "lastStatus": [
+              "STOPPED",
+            ],
+            "launchType": [
+              "FARGATE",
+            ],
+          },
+          "detail-type": [
+            "ECS Task State Change",
+          ],
+          "source": [
+            "aws.ecs",
+          ],
+        },
+        "State": "ENABLED",
+      },
+      "Type": "AWS::Events::Rule",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`snapshots should match the snapshot for extended excluded stop codes 1`] = `
+{
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "Rule4C995B7F": {
+      "Properties": {
+        "EventPattern": {
+          "detail": {
+            "$or": [
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "anything-but": [
+                      "UserInitiated",
+                      "SpotInterruption",
+                      "TerminationNotice",
+                    ],
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "stopCode": [
+                  "TaskFailedToStart",
+                ],
+              },
+              {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "prefix": "CannotPullContainerError",
+                  },
+                  {
+                    "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
+                  },
+                ],
+              },
+            ],
+            "clusterArn": [
+              "arn:aws:ecs:us-east-1:123456789012:cluster/example-app-cluster",
+            ],
+            "lastStatus": [
+              "STOPPED",
+            ],
+            "launchType": [
+              "FARGATE",
+            ],
+          },
+          "detail-type": [
+            "ECS Task State Change",
+          ],
+          "source": [
+            "aws.ecs",
+          ],
+        },
+        "State": "ENABLED",
+      },
+      "Type": "AWS::Events::Rule",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`snapshots should match the snapshot for extended excluded stoppedReason prefixes 1`] = `
+{
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "Rule4C995B7F": {
+      "Properties": {
+        "EventPattern": {
+          "detail": {
+            "$or": [
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "anything-but": [
+                      "UserInitiated",
+                      "SpotInterruption",
+                    ],
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                        "Custom reason",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "anything-but": {
@@ -415,12 +1044,23 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                 ],
               },
               {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "prefix": "CannotPullContainerError",
                   },
                   {
                     "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
                   },
                 ],
               },
@@ -477,7 +1117,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for group 1`] = `
+exports[`snapshots should match the snapshot for extended startup failure prefixes 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -500,6 +1140,39 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                     },
                   ],
                 },
+                "stopCode": [
+                  {
+                    "anything-but": [
+                      "UserInitiated",
+                      "SpotInterruption",
+                    ],
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "anything-but": {
@@ -518,12 +1191,173 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                 ],
               },
               {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "prefix": "CannotPullContainerError",
                   },
                   {
                     "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
+                  },
+                  {
+                    "prefix": "Custom startup failure",
+                  },
+                ],
+              },
+            ],
+            "clusterArn": [
+              "arn:aws:ecs:us-east-1:123456789012:cluster/example-app-cluster",
+            ],
+            "lastStatus": [
+              "STOPPED",
+            ],
+            "launchType": [
+              "FARGATE",
+            ],
+          },
+          "detail-type": [
+            "ECS Task State Change",
+          ],
+          "source": [
+            "aws.ecs",
+          ],
+        },
+        "State": "ENABLED",
+      },
+      "Type": "AWS::Events::Rule",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`snapshots should match the snapshot for group 1`] = `
+{
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "Rule4C995B7F": {
+      "Properties": {
+        "EventPattern": {
+          "detail": {
+            "$or": [
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "anything-but": [
+                      "UserInitiated",
+                      "SpotInterruption",
+                    ],
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "stopCode": [
+                  "TaskFailedToStart",
+                ],
+              },
+              {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "prefix": "CannotPullContainerError",
+                  },
+                  {
+                    "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
                   },
                 ],
               },
@@ -583,7 +1417,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for no excluded stoppedReason prefixes 1`] = `
+exports[`snapshots should match the snapshot for ignoredExitCodes 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -602,10 +1436,60 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                 "containers": {
                   "exitCode": [
                     {
-                      "anything-but": 0,
+                      "anything-but": [
+                        0,
+                        143,
+                      ],
                     },
                   ],
                 },
+                "stopCode": [
+                  {
+                    "anything-but": [
+                      "UserInitiated",
+                      "SpotInterruption",
+                    ],
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": [
+                        0,
+                        143,
+                      ],
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
               },
               {
                 "stopCode": [
@@ -613,12 +1497,23 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                 ],
               },
               {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "prefix": "CannotPullContainerError",
                   },
                   {
                     "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
                   },
                 ],
               },
@@ -675,7 +1570,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for serviceName 1`] = `
+exports[`snapshots should match the snapshot for no excluded stoppedReason prefixes 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -698,6 +1593,289 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                     },
                   ],
                 },
+                "stopCode": [
+                  {
+                    "anything-but": [
+                      "UserInitiated",
+                      "SpotInterruption",
+                    ],
+                  },
+                ],
+              },
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
+              },
+              {
+                "stopCode": [
+                  "TaskFailedToStart",
+                ],
+              },
+              {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "prefix": "CannotPullContainerError",
+                  },
+                  {
+                    "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
+                  },
+                ],
+              },
+            ],
+            "clusterArn": [
+              "arn:aws:ecs:us-east-1:123456789012:cluster/example-app-cluster",
+            ],
+            "lastStatus": [
+              "STOPPED",
+            ],
+            "launchType": [
+              "FARGATE",
+            ],
+          },
+          "detail-type": [
+            "ECS Task State Change",
+          ],
+          "source": [
+            "aws.ecs",
+          ],
+        },
+        "State": "ENABLED",
+      },
+      "Type": "AWS::Events::Rule",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`snapshots should match the snapshot for no startup failure prefixes 1`] = `
+{
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "Rule4C995B7F": {
+      "Properties": {
+        "EventPattern": {
+          "detail": {
+            "$or": [
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "anything-but": [
+                      "UserInitiated",
+                      "SpotInterruption",
+                    ],
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "stopCode": [
+                  "TaskFailedToStart",
+                ],
+              },
+            ],
+            "clusterArn": [
+              "arn:aws:ecs:us-east-1:123456789012:cluster/example-app-cluster",
+            ],
+            "lastStatus": [
+              "STOPPED",
+            ],
+            "launchType": [
+              "FARGATE",
+            ],
+          },
+          "detail-type": [
+            "ECS Task State Change",
+          ],
+          "source": [
+            "aws.ecs",
+          ],
+        },
+        "State": "ENABLED",
+      },
+      "Type": "AWS::Events::Rule",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`snapshots should match the snapshot for replaced excluded stop codes 1`] = `
+{
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "Rule4C995B7F": {
+      "Properties": {
+        "EventPattern": {
+          "detail": {
+            "$or": [
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "anything-but": [
+                      "UserInitiated",
+                    ],
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "anything-but": {
@@ -716,12 +1894,170 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                 ],
               },
               {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "prefix": "CannotPullContainerError",
                   },
                   {
                     "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
+                  },
+                ],
+              },
+            ],
+            "clusterArn": [
+              "arn:aws:ecs:us-east-1:123456789012:cluster/example-app-cluster",
+            ],
+            "lastStatus": [
+              "STOPPED",
+            ],
+            "launchType": [
+              "FARGATE",
+            ],
+          },
+          "detail-type": [
+            "ECS Task State Change",
+          ],
+          "source": [
+            "aws.ecs",
+          ],
+        },
+        "State": "ENABLED",
+      },
+      "Type": "AWS::Events::Rule",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`snapshots should match the snapshot for serviceName 1`] = `
+{
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "Rule4C995B7F": {
+      "Properties": {
+        "EventPattern": {
+          "detail": {
+            "$or": [
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "anything-but": [
+                      "UserInitiated",
+                      "SpotInterruption",
+                    ],
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "stopCode": [
+                  "TaskFailedToStart",
+                ],
+              },
+              {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "prefix": "CannotPullContainerError",
+                  },
+                  {
+                    "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
                   },
                 ],
               },
@@ -781,7 +2117,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for serviceName and taskDefinitionArn 1`] = `
+exports[`snapshots should match the snapshot for serviceName and taskDefinitionArn 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -804,6 +2140,39 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                     },
                   ],
                 },
+                "stopCode": [
+                  {
+                    "anything-but": [
+                      "UserInitiated",
+                      "SpotInterruption",
+                    ],
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "anything-but": {
@@ -822,12 +2191,23 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                 ],
               },
               {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "prefix": "CannotPullContainerError",
                   },
                   {
                     "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
                   },
                 ],
               },
@@ -890,7 +2270,7 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
 }
 `;
 
-exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for taskDefinitionArn 1`] = `
+exports[`snapshots should match the snapshot for serviceNames 1`] = `
 {
   "Parameters": {
     "BootstrapVersion": {
@@ -913,6 +2293,39 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                     },
                   ],
                 },
+                "stopCode": [
+                  {
+                    "anything-but": [
+                      "UserInitiated",
+                      "SpotInterruption",
+                    ],
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "anything-but": {
@@ -931,12 +2344,174 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                 ],
               },
               {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "prefix": "CannotPullContainerError",
                   },
                   {
                     "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
+                  },
+                ],
+              },
+            ],
+            "clusterArn": [
+              "arn:aws:ecs:us-east-1:123456789012:cluster/example-app-cluster",
+            ],
+            "group": [
+              "service:example-api",
+              "service:example-worker",
+            ],
+            "lastStatus": [
+              "STOPPED",
+            ],
+            "launchType": [
+              "FARGATE",
+            ],
+          },
+          "detail-type": [
+            "ECS Task State Change",
+          ],
+          "source": [
+            "aws.ecs",
+          ],
+        },
+        "State": "ENABLED",
+      },
+      "Type": "AWS::Events::Rule",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`snapshots should match the snapshot for taskDefinitionArn 1`] = `
+{
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "Rule4C995B7F": {
+      "Properties": {
+        "EventPattern": {
+          "detail": {
+            "$or": [
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "anything-but": [
+                      "UserInitiated",
+                      "SpotInterruption",
+                    ],
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "stopCode": [
+                  "TaskFailedToStart",
+                ],
+              },
+              {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "prefix": "CannotPullContainerError",
+                  },
+                  {
+                    "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
                   },
                 ],
               },

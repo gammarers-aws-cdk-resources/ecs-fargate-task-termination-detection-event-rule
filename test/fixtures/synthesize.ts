@@ -20,7 +20,8 @@ export const createStack = (): Stack => {
 /**
  * Synthesizes one rule in a new stack.
  *
- * @param props - Rule props. `clusterArn` defaults to {@link CLUSTER_ARN}.
+ * @param props - Rule props. `clusterArn` defaults to {@link CLUSTER_ARN} unless
+ *   `cluster`, `clusterArn`, `clusterArns`, or `service` is set.
  * @returns Template of the stack that holds the rule.
  * @throws Error if the construct rejects `props`.
  */
@@ -28,8 +29,12 @@ export const createTemplate = (
   props: Partial<EcsFargateTaskTerminationDetectionEventRuleProps> = {},
 ): Template => {
   const stack = createStack();
+  const hasClusterSource = props.cluster !== undefined
+    || props.clusterArn !== undefined
+    || props.clusterArns !== undefined
+    || props.service !== undefined;
   new EcsFargateTaskTerminationDetectionEventRule(stack, 'Rule', {
-    clusterArn: CLUSTER_ARN,
+    ...(hasClusterSource ? {} : { clusterArn: CLUSTER_ARN }),
     ...props,
   });
 
