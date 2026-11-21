@@ -216,6 +216,24 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
     expect(DefaultStartupFailureStoppedReasonPrefixes.ALL).toEqual(DEFAULT_STARTUP_PREFIXES);
   });
 
+  it('should freeze each default list', () => {
+    expect(Object.isFrozen(DefaultExcludedStoppedReasonPrefixes.ALL)).toBe(true);
+    expect(Object.isFrozen(DefaultExcludedStopCodes.ALL)).toBe(true);
+    expect(Object.isFrozen(DefaultStartupFailureStoppedReasonPrefixes.ALL)).toBe(true);
+    expect(() => {
+      DefaultExcludedStoppedReasonPrefixes.ALL.push('mutated');
+    }).toThrow(TypeError);
+    expect(() => {
+      DefaultExcludedStopCodes.ALL.push('mutated');
+    }).toThrow(TypeError);
+    expect(() => {
+      DefaultStartupFailureStoppedReasonPrefixes.ALL.push('mutated');
+    }).toThrow(TypeError);
+    expect(DefaultExcludedStoppedReasonPrefixes.ALL).toEqual(DEFAULT_EXCLUDED_PREFIXES);
+    expect(DefaultExcludedStopCodes.ALL).toEqual(DEFAULT_EXCLUDED_STOP_CODES);
+    expect(DefaultStartupFailureStoppedReasonPrefixes.ALL).toEqual(DEFAULT_STARTUP_PREFIXES);
+  });
+
   describe('detectionMode', () => {
     it.each([
       {

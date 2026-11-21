@@ -803,7 +803,7 @@ export enum EcsTaskStopCode {
  *
  * Override via {@link EcsFargateTaskTerminationDetectionEventRuleProps.excludedStopCodes}.
  * To extend this set, spread {@link DefaultExcludedStopCodes.ALL} and append
- * {@link EcsTaskStopCode} values.
+ * {@link EcsTaskStopCode} values. `ALL` is frozen. Mutating it throws.
  */
 export class DefaultExcludedStopCodes {
   /**
@@ -821,11 +821,13 @@ export class DefaultExcludedStopCodes {
    *
    * Contains {@link DefaultExcludedStopCodes.USER_INITIATED} and
    * {@link DefaultExcludedStopCodes.SPOT_INTERRUPTION}.
+   * The array is frozen. Spread it to extend the set. Mutating it throws,
+   * so the library default cannot be changed.
    */
-  public static readonly ALL: string[] = [
+  public static readonly ALL: string[] = Object.freeze([
     DefaultExcludedStopCodes.USER_INITIATED,
     DefaultExcludedStopCodes.SPOT_INTERRUPTION,
-  ];
+  ]) as string[];
 }
 
 /**
@@ -838,7 +840,7 @@ export class DefaultExcludedStopCodes {
  *
  * Override via {@link EcsFargateTaskTerminationDetectionEventRuleProps.excludedStoppedReasonPrefixes}.
  * To extend this set, spread {@link DefaultExcludedStoppedReasonPrefixes.ALL}
- * and append extra prefixes.
+ * and append extra prefixes. `ALL` is frozen. Mutating it throws.
  */
 export class DefaultExcludedStoppedReasonPrefixes {
   /**
@@ -863,12 +865,14 @@ export class DefaultExcludedStoppedReasonPrefixes {
    * Contains {@link DefaultExcludedStoppedReasonPrefixes.SCALING_ACTIVITY_INITIATED_BY},
    * {@link DefaultExcludedStoppedReasonPrefixes.TASK_STOPPED_BY_USER}, and
    * {@link DefaultExcludedStoppedReasonPrefixes.SPOT_TASK_INTERRUPTED}.
+   * The array is frozen. Spread it to extend the set. Mutating it throws,
+   * so the library default cannot be changed.
    */
-  public static readonly ALL: string[] = [
+  public static readonly ALL: string[] = Object.freeze([
     DefaultExcludedStoppedReasonPrefixes.SCALING_ACTIVITY_INITIATED_BY,
     DefaultExcludedStoppedReasonPrefixes.TASK_STOPPED_BY_USER,
     DefaultExcludedStoppedReasonPrefixes.SPOT_TASK_INTERRUPTED,
-  ];
+  ]) as string[];
 }
 
 /**
@@ -879,6 +883,7 @@ export class DefaultExcludedStoppedReasonPrefixes {
  *
  * Override via {@link EcsFargateTaskTerminationDetectionEventRuleProps.startupFailureStoppedReasonPrefixes}.
  * To extend this set, spread {@link DefaultStartupFailureStoppedReasonPrefixes.ALL}.
+ * `ALL` is frozen. Mutating it throws.
  */
 export class DefaultStartupFailureStoppedReasonPrefixes {
   /**
@@ -908,13 +913,15 @@ export class DefaultStartupFailureStoppedReasonPrefixes {
    * {@link DefaultStartupFailureStoppedReasonPrefixes.RESOURCE_INITIALIZATION_ERROR},
    * {@link DefaultStartupFailureStoppedReasonPrefixes.CANNOT_START_CONTAINER_ERROR}, and
    * {@link DefaultStartupFailureStoppedReasonPrefixes.TASK_FAILED_TO_START}.
+   * The array is frozen. Spread it to extend the set. Mutating it throws,
+   * so the library default cannot be changed.
    */
-  public static readonly ALL: string[] = [
+  public static readonly ALL: string[] = Object.freeze([
     DefaultStartupFailureStoppedReasonPrefixes.CANNOT_PULL_CONTAINER_ERROR,
     DefaultStartupFailureStoppedReasonPrefixes.RESOURCE_INITIALIZATION_ERROR,
     DefaultStartupFailureStoppedReasonPrefixes.CANNOT_START_CONTAINER_ERROR,
     DefaultStartupFailureStoppedReasonPrefixes.TASK_FAILED_TO_START,
-  ];
+  ]) as string[];
 }
 
 /**
@@ -1053,6 +1060,7 @@ export interface EcsFargateTaskTerminationDetectionEventRuleProps extends RulePr
    *
    * Pass a new array to replace the default set. To extend defaults, spread
    * {@link DefaultExcludedStopCodes.ALL} and append {@link EcsTaskStopCode} values.
+   * `ALL` is frozen. Mutating it throws.
    * Pass an empty array to disable `stopCode` exclusion.
    *
    * @default DefaultExcludedStopCodes.ALL
@@ -1070,6 +1078,7 @@ export interface EcsFargateTaskTerminationDetectionEventRuleProps extends RulePr
    *
    * Pass a new array to replace the default set. To extend defaults, spread
    * {@link DefaultExcludedStoppedReasonPrefixes.ALL} and append prefixes.
+   * `ALL` is frozen. Mutating it throws.
    * Pass an empty array to disable prefix exclusion.
    *
    * @default DefaultExcludedStoppedReasonPrefixes.ALL
@@ -1086,8 +1095,9 @@ export interface EcsFargateTaskTerminationDetectionEventRuleProps extends RulePr
    * use this list.
    *
    * Pass a new array to replace the default set. To extend defaults, spread
-   * {@link DefaultStartupFailureStoppedReasonPrefixes.ALL}. Pass an empty array
-   * to match startup failures only by `stopCode` `TaskFailedToStart`.
+   * {@link DefaultStartupFailureStoppedReasonPrefixes.ALL}.
+   * `ALL` is frozen. Mutating it throws.
+   * Pass an empty array to match startup failures only by `stopCode` `TaskFailedToStart`.
    *
    * @default DefaultStartupFailureStoppedReasonPrefixes.ALL
    */

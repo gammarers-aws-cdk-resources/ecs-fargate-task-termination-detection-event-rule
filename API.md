@@ -691,6 +691,7 @@ is unchanged.
 
 Pass a new array to replace the default set. To extend defaults, spread
 {@link DefaultExcludedStopCodes.ALL} and append {@link EcsTaskStopCode} values.
+`ALL` is frozen. Mutating it throws.
 Pass an empty array to disable `stopCode` exclusion.
 
 ---
@@ -713,6 +714,7 @@ Startup-failure matching is unchanged.
 
 Pass a new array to replace the default set. To extend defaults, spread
 {@link DefaultExcludedStoppedReasonPrefixes.ALL} and append prefixes.
+`ALL` is frozen. Mutating it throws.
 Pass an empty array to disable prefix exclusion.
 
 ---
@@ -822,8 +824,9 @@ public readonly startupFailureStoppedReasonPrefixes: string[];
 use this list.
 
 Pass a new array to replace the default set. To extend defaults, spread
-{@link DefaultStartupFailureStoppedReasonPrefixes.ALL}. Pass an empty array
-to match startup failures only by `stopCode` `TaskFailedToStart`.
+{@link DefaultStartupFailureStoppedReasonPrefixes.ALL}.
+`ALL` is frozen. Mutating it throws.
+Pass an empty array to match startup failures only by `stopCode` `TaskFailedToStart`.
 
 ---
 
@@ -856,7 +859,7 @@ uses that code as well as scale-in. Scale-in stays excluded by
 
 Override via {@link EcsFargateTaskTerminationDetectionEventRuleProps.excludedStopCodes}.
 To extend this set, spread {@link DefaultExcludedStopCodes.ALL} and append
-{@link EcsTaskStopCode} values.
+{@link EcsTaskStopCode} values. `ALL` is frozen. Mutating it throws.
 
 #### Initializers <a name="Initializers" id="ecs-fargate-task-termination-detection-event-rule.DefaultExcludedStopCodes.Initializer"></a>
 
@@ -896,6 +899,8 @@ All default stop codes, in a stable order.
 
 Contains {@link DefaultExcludedStopCodes.USER_INITIATED} and
 {@link DefaultExcludedStopCodes.SPOT_INTERRUPTION}.
+The array is frozen. Spread it to extend the set. Mutating it throws,
+so the library default cannot be changed.
 
 ---
 
@@ -933,7 +938,7 @@ only operational-stop filter when `stopCode` is absent.
 
 Override via {@link EcsFargateTaskTerminationDetectionEventRuleProps.excludedStoppedReasonPrefixes}.
 To extend this set, spread {@link DefaultExcludedStoppedReasonPrefixes.ALL}
-and append extra prefixes.
+and append extra prefixes. `ALL` is frozen. Mutating it throws.
 
 #### Initializers <a name="Initializers" id="ecs-fargate-task-termination-detection-event-rule.DefaultExcludedStoppedReasonPrefixes.Initializer"></a>
 
@@ -975,6 +980,8 @@ All default prefixes, in a stable order.
 Contains {@link DefaultExcludedStoppedReasonPrefixes.SCALING_ACTIVITY_INITIATED_BY},
 {@link DefaultExcludedStoppedReasonPrefixes.TASK_STOPPED_BY_USER}, and
 {@link DefaultExcludedStoppedReasonPrefixes.SPOT_TASK_INTERRUPTED}.
+The array is frozen. Spread it to extend the set. Mutating it throws,
+so the library default cannot be changed.
 
 ---
 
@@ -1022,6 +1029,7 @@ Default `stoppedReason` prefixes that match a startup failure when `stopCode` is
 
 Override via {@link EcsFargateTaskTerminationDetectionEventRuleProps.startupFailureStoppedReasonPrefixes}.
 To extend this set, spread {@link DefaultStartupFailureStoppedReasonPrefixes.ALL}.
+`ALL` is frozen. Mutating it throws.
 
 #### Initializers <a name="Initializers" id="ecs-fargate-task-termination-detection-event-rule.DefaultStartupFailureStoppedReasonPrefixes.Initializer"></a>
 
@@ -1065,6 +1073,8 @@ Contains {@link DefaultStartupFailureStoppedReasonPrefixes.CANNOT_PULL_CONTAINER
 {@link DefaultStartupFailureStoppedReasonPrefixes.RESOURCE_INITIALIZATION_ERROR},
 {@link DefaultStartupFailureStoppedReasonPrefixes.CANNOT_START_CONTAINER_ERROR}, and
 {@link DefaultStartupFailureStoppedReasonPrefixes.TASK_FAILED_TO_START}.
+The array is frozen. Spread it to extend the set. Mutating it throws,
+so the library default cannot be changed.
 
 ---
 
