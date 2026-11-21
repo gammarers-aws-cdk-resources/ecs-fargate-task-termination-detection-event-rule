@@ -213,6 +213,31 @@ export const TASK_EVENT_CASES: TaskEventCase[] = [
     expectation: 'miss',
   },
   {
+    name: 'matches CannotStartContainerError when stopCode is absent',
+    rule: 'default',
+    event: taskEvent({
+      stoppedReason: 'CannotStartContainerError: Error response from daemon',
+    }),
+    expectation: 'match',
+  },
+  {
+    name: 'matches a task failed to start reason when stopCode is absent',
+    rule: 'default',
+    event: taskEvent({
+      stoppedReason: 'Task failed to start',
+    }),
+    expectation: 'match',
+  },
+  {
+    name: 'ignores a pull error when stopCode is not TaskFailedToStart',
+    rule: 'default',
+    event: taskEvent({
+      stoppedReason: 'CannotPullContainerError: pull access denied',
+      stopCode: 'EssentialContainerExited',
+    }),
+    expectation: 'miss',
+  },
+  {
     name: 'matches a non-zero exit when stopCode is absent',
     rule: 'default',
     event: taskEvent({

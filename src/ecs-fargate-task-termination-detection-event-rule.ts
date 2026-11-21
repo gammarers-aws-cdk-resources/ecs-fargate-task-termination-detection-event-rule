@@ -18,21 +18,6 @@ const ECS_TASK_STATE_CHANGE_DETAIL_TYPE = 'ECS Task State Change';
 const TASK_LAST_STATUS_STOPPED = 'STOPPED';
 
 /**
- * ECS `stopCode` when the task never reached a running container.
- */
-const STOP_CODE_TASK_FAILED_TO_START = 'TaskFailedToStart';
-
-/**
- * `stoppedReason` prefix for an image pull failure.
- */
-const CANNOT_PULL_CONTAINER_ERROR_PREFIX = 'CannotPullContainerError';
-
-/**
- * `stoppedReason` prefix for an ENI or secrets initialization failure.
- */
-const RESOURCE_INITIALIZATION_ERROR_PREFIX = 'ResourceInitializationError';
-
-/**
  * Container `exitCode` for a successful exit. Any other code is a failure.
  */
 const SUCCESSFUL_CONTAINER_EXIT_CODE = 0;
@@ -114,6 +99,12 @@ interface FailureDetailOptions extends ScopeDetailOptions {
    * Resolved `stoppedReason` prefixes excluded from non-zero exit-code matching.
    */
   readonly excludedStoppedReasonPrefixes: string[];
+
+  /**
+   * Resolved `stoppedReason` prefixes that match a startup failure when
+   * `stopCode` is absent.
+   */
+  readonly startupFailureStoppedReasonPrefixes: string[];
 }
 
 /**
@@ -136,6 +127,12 @@ interface EventPatternOptions extends ScopeDetailOptions {
    * `undefined` for {@link DefaultExcludedStoppedReasonPrefixes.ALL}.
    */
   readonly excludedStoppedReasonPrefixes?: string[];
+
+  /**
+   * Startup-failure `stoppedReason` prefixes, or `undefined` for
+   * {@link DefaultStartupFailureStoppedReasonPrefixes.ALL}.
+   */
+  readonly startupFailureStoppedReasonPrefixes?: string[];
 }
 
 /**
@@ -171,6 +168,26 @@ const resolveExcludedStoppedReasonPrefixes = (
 
   if (resolved.some((prefix) => prefix.length === 0)) {
     throw new Error('excludedStoppedReasonPrefixes must not contain empty strings.');
+  }
+
+  return resolved;
+};
+
+/**
+ * Resolves startup-failure `stoppedReason` prefixes, defaulting to
+ * {@link DefaultStartupFailureStoppedReasonPrefixes.ALL}.
+ *
+ * @param prefixes - Caller-supplied prefixes, or `undefined` for the default set.
+ * @returns Prefixes that match a startup failure when `stopCode` is absent.
+ * @throws Error if any prefix is an empty string.
+ */
+const resolveStartupFailureStoppedReasonPrefixes = (
+  prefixes: string[] | undefined,
+): string[] => {
+  const resolved = prefixes ?? [...DefaultStartupFailureStoppedReasonPrefixes.ALL];
+
+  if (resolved.some((prefix) => prefix.length === 0)) {
+    throw new Error('startupFailureStoppedReasonPrefixes must not contain empty strings.');
   }
 
   return resolved;
@@ -274,34 +291,32 @@ const attachBranches = (
 };
 
 /**
- * `$or` branch that matches ECS `stopCode` = `TaskFailedToStart`
- * (covers pull/start failures where `exitCode` is typically absent).
- */
-const TASK_FAILED_TO_START_STOP_CODE_CONDITION = {
-  stopCode: [STOP_CODE_TASK_FAILED_TO_START],
-};
-
-/**
- * `$or` branch with `stoppedReason` prefix matches for common startup failures
- * where `exitCode` is often absent.
+ * Builds the startup-failure branches.
  *
- * Used as a fallback when `stopCode` is not present on the event.
+ * `stopCode` `TaskFailedToStart` is the primary match. Known `stoppedReason`
+ * prefixes match only when `stopCode` is absent, so a pull-error reason paired
+ * with another stop code is not treated as a startup failure.
+ *
+ * @param prefixes - Startup-failure prefixes. An empty list leaves only the stop-code branch.
+ * @returns One branch when there are no prefixes, otherwise two.
  */
-const TASK_FAILED_TO_START_STOPPED_REASON_CONDITION = {
-  stoppedReason: [
-    { [PREFIX_FILTER]: CANNOT_PULL_CONTAINER_ERROR_PREFIX },
-    { [PREFIX_FILTER]: RESOURCE_INITIALIZATION_ERROR_PREFIX },
-  ],
-};
+const buildStartupBranches = (prefixes: readonly string[]): Record<string, unknown>[] => {
+  const withStopCode = {
+    stopCode: [EcsTaskStopCode.TASK_FAILED_TO_START],
+  };
 
-/**
- * `$or` conditions that detect startup/pull failures without relying on
- * `containers.exitCode`.
- */
-const STARTUP_FAILURE_OR_CONDITIONS = [
-  TASK_FAILED_TO_START_STOP_CODE_CONDITION,
-  TASK_FAILED_TO_START_STOPPED_REASON_CONDITION,
-];
+  if (prefixes.length === 0) {
+    return [withStopCode];
+  }
+
+  return [
+    withStopCode,
+    {
+      stopCode: [{ [EXISTS_FILTER]: false }],
+      stoppedReason: prefixes.map((prefix) => ({ [PREFIX_FILTER]: prefix })),
+    },
+  ];
+};
 
 /**
  * Rejects an empty scope value.
@@ -408,20 +423,21 @@ const buildScopeDetail = (options: ScopeDetailOptions): Record<string, unknown> 
  *   `options.scope.serviceName` starts with `service:`.
  */
 const buildFailureDetail = (options: FailureDetailOptions): Record<string, unknown> => {
-  const { detectionMode, excludedStopCodes, excludedStoppedReasonPrefixes } = options;
+  const { detectionMode, excludedStopCodes, excludedStoppedReasonPrefixes, startupFailureStoppedReasonPrefixes } = options;
   const base = buildScopeDetail(options);
   const exitBranches = buildNonZeroExitBranches(excludedStoppedReasonPrefixes, excludedStopCodes);
+  const startupBranches = buildStartupBranches(startupFailureStoppedReasonPrefixes);
 
   if (detectionMode === EcsFargateTaskTerminationDetectionMode.NON_ZERO_EXIT_CODE) {
     return attachBranches(base, exitBranches);
   }
 
   if (detectionMode === EcsFargateTaskTerminationDetectionMode.TASK_FAILED_TO_START) {
-    return attachBranches(base, STARTUP_FAILURE_OR_CONDITIONS);
+    return attachBranches(base, startupBranches);
   }
 
   if (detectionMode === EcsFargateTaskTerminationDetectionMode.ALL_FAILURES) {
-    return attachBranches(base, [...exitBranches, ...STARTUP_FAILURE_OR_CONDITIONS]);
+    return attachBranches(base, [...exitBranches, ...startupBranches]);
   }
 
   throw new Error(`Unsupported detectionMode: ${detectionMode}`);
@@ -436,8 +452,8 @@ const buildFailureDetail = (options: FailureDetailOptions): Record<string, unkno
  * @param options - Cluster ARN, scope filters, detection mode, and the optional
  *   exclusions.
  * @returns Event pattern targeting `aws.ecs` / `ECS Task State Change`.
- * @throws Error if `options.excludedStopCodes` or
- *   `options.excludedStoppedReasonPrefixes` contains an empty string.
+ * @throws Error if `options.excludedStopCodes`, `options.excludedStoppedReasonPrefixes`,
+ *   or `options.startupFailureStoppedReasonPrefixes` contains an empty string.
  * @throws Error if `options.scope.serviceName` and `options.scope.group` are both set.
  * @throws Error if a scope value is an empty string, or if
  *   `options.scope.serviceName` starts with `service:`.
@@ -450,6 +466,9 @@ const buildEventPattern = (options: EventPatternOptions): EventPattern => ({
     ...options,
     excludedStopCodes: resolveExcludedStopCodes(options.excludedStopCodes),
     excludedStoppedReasonPrefixes: resolveExcludedStoppedReasonPrefixes(options.excludedStoppedReasonPrefixes),
+    startupFailureStoppedReasonPrefixes: resolveStartupFailureStoppedReasonPrefixes(
+      options.startupFailureStoppedReasonPrefixes,
+    ),
   }),
 });
 
@@ -467,11 +486,10 @@ export enum EcsFargateTaskTerminationDetectionMode {
   NON_ZERO_EXIT_CODE = 'NON_ZERO_EXIT_CODE',
 
   /**
-   * Detect only tasks that failed to start (for example image pull failures).
+   * Detect only tasks that failed to start.
    *
-   * Matched via `stopCode` = `TaskFailedToStart` or known startup-failure
-   * `stoppedReason` prefixes (`CannotPullContainerError`,
-   * `ResourceInitializationError`).
+   * Matched via `stopCode` `TaskFailedToStart`. When `stopCode` is absent,
+   * known startup-failure `stoppedReason` prefixes match instead.
    */
   TASK_FAILED_TO_START = 'TASK_FAILED_TO_START',
 
@@ -604,6 +622,52 @@ export class DefaultExcludedStoppedReasonPrefixes {
 }
 
 /**
+ * Default `stoppedReason` prefixes that match a startup failure when `stopCode`
+ * is absent.
+ *
+ * `stopCode` `TaskFailedToStart` is matched separately and does not use this list.
+ *
+ * Override via {@link EcsFargateTaskTerminationDetectionEventRuleProps.startupFailureStoppedReasonPrefixes}.
+ * To extend this set, spread {@link DefaultStartupFailureStoppedReasonPrefixes.ALL}.
+ */
+export class DefaultStartupFailureStoppedReasonPrefixes {
+  /**
+   * Image pull failure.
+   */
+  public static readonly CANNOT_PULL_CONTAINER_ERROR = 'CannotPullContainerError';
+
+  /**
+   * ENI or secrets initialization failure.
+   */
+  public static readonly RESOURCE_INITIALIZATION_ERROR = 'ResourceInitializationError';
+
+  /**
+   * Container runtime failed to start the container.
+   */
+  public static readonly CANNOT_START_CONTAINER_ERROR = 'CannotStartContainerError';
+
+  /**
+   * Generic "task failed to start" wording used when `stopCode` was not set.
+   */
+  public static readonly TASK_FAILED_TO_START = 'Task failed to start';
+
+  /**
+   * All default startup-failure prefixes, in a stable order.
+   *
+   * Contains {@link DefaultStartupFailureStoppedReasonPrefixes.CANNOT_PULL_CONTAINER_ERROR},
+   * {@link DefaultStartupFailureStoppedReasonPrefixes.RESOURCE_INITIALIZATION_ERROR},
+   * {@link DefaultStartupFailureStoppedReasonPrefixes.CANNOT_START_CONTAINER_ERROR}, and
+   * {@link DefaultStartupFailureStoppedReasonPrefixes.TASK_FAILED_TO_START}.
+   */
+  public static readonly ALL: string[] = [
+    DefaultStartupFailureStoppedReasonPrefixes.CANNOT_PULL_CONTAINER_ERROR,
+    DefaultStartupFailureStoppedReasonPrefixes.RESOURCE_INITIALIZATION_ERROR,
+    DefaultStartupFailureStoppedReasonPrefixes.CANNOT_START_CONTAINER_ERROR,
+    DefaultStartupFailureStoppedReasonPrefixes.TASK_FAILED_TO_START,
+  ];
+}
+
+/**
  * Properties for {@link EcsFargateTaskTerminationDetectionEventRule}.
  *
  * Extends EventBridge {@link RuleProps}, except `eventPattern` which must not
@@ -693,6 +757,23 @@ export interface EcsFargateTaskTerminationDetectionEventRuleProps extends RulePr
    * @default DefaultExcludedStoppedReasonPrefixes.ALL
    */
   readonly excludedStoppedReasonPrefixes?: string[];
+
+  /**
+   * `stoppedReason` prefixes that match a startup failure when the event has
+   * no `stopCode`.
+   *
+   * `stopCode` `TaskFailedToStart` always matches in
+   * {@link EcsFargateTaskTerminationDetectionMode.TASK_FAILED_TO_START} and
+   * {@link EcsFargateTaskTerminationDetectionMode.ALL_FAILURES}, and does not
+   * use this list.
+   *
+   * Pass a new array to replace the default set. To extend defaults, spread
+   * {@link DefaultStartupFailureStoppedReasonPrefixes.ALL}. Pass an empty array
+   * to match startup failures only by `stopCode` `TaskFailedToStart`.
+   *
+   * @default DefaultStartupFailureStoppedReasonPrefixes.ALL
+   */
+  readonly startupFailureStoppedReasonPrefixes?: string[];
 }
 
 /**
@@ -702,8 +783,9 @@ export interface EcsFargateTaskTerminationDetectionEventRuleProps extends RulePr
  * Fargate Spot interruptions).
  *
  * By default this matches both non-zero container exit codes and startup/pull
- * failures where `exitCode` is absent (for example `CannotPullContainerError`
- * / `TaskFailedToStart`). Use {@link EcsFargateTaskTerminationDetectionMode}
+ * failures where `exitCode` is absent. Startup failures match `stopCode`
+ * `TaskFailedToStart`, and {@link DefaultStartupFailureStoppedReasonPrefixes.ALL}
+ * when `stopCode` is absent. Use {@link EcsFargateTaskTerminationDetectionMode}
  * to narrow the match if needed.
  *
  * User-initiated stops and Fargate Spot interruptions are excluded by
@@ -726,8 +808,8 @@ export class EcsFargateTaskTerminationDetectionEventRule extends Rule {
    * @param props - Rule properties including required `clusterArn`.
    * @throws Error if `props.eventPattern` is provided. This construct always
    *   manages its own `eventPattern`.
-   * @throws Error if `props.excludedStopCodes` or `props.excludedStoppedReasonPrefixes`
-   *   contains an empty string.
+   * @throws Error if `props.excludedStopCodes`, `props.excludedStoppedReasonPrefixes`,
+   *   or `props.startupFailureStoppedReasonPrefixes` contains an empty string.
    * @throws Error if `props.serviceName` and `props.group` are both set.
    * @throws Error if `props.serviceName`, `props.group`, or
    *   `props.taskDefinitionArn` is an empty string.
@@ -741,6 +823,7 @@ export class EcsFargateTaskTerminationDetectionEventRule extends Rule {
       detectionMode = EcsFargateTaskTerminationDetectionMode.ALL_FAILURES,
       excludedStopCodes,
       excludedStoppedReasonPrefixes,
+      startupFailureStoppedReasonPrefixes,
       serviceName,
       group,
       taskDefinitionArn,
@@ -758,6 +841,7 @@ export class EcsFargateTaskTerminationDetectionEventRule extends Rule {
         detectionMode,
         excludedStopCodes,
         excludedStoppedReasonPrefixes,
+        startupFailureStoppedReasonPrefixes,
         scope: {
           serviceName,
           group,

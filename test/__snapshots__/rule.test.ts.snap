@@ -74,12 +74,23 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                 ],
               },
               {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "prefix": "CannotPullContainerError",
                   },
                   {
                     "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
                   },
                 ],
               },
@@ -278,12 +289,23 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                 ],
               },
               {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "prefix": "CannotPullContainerError",
                   },
                   {
                     "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
                   },
                 ],
               },
@@ -414,12 +436,23 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                 ],
               },
               {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "prefix": "CannotPullContainerError",
                   },
                   {
                     "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
                   },
                 ],
               },
@@ -551,12 +584,23 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                 ],
               },
               {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "prefix": "CannotPullContainerError",
                   },
                   {
                     "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
                   },
                 ],
               },
@@ -689,12 +733,173 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                 ],
               },
               {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "prefix": "CannotPullContainerError",
                   },
                   {
                     "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
+                  },
+                ],
+              },
+            ],
+            "clusterArn": [
+              "arn:aws:ecs:us-east-1:123456789012:cluster/example-app-cluster",
+            ],
+            "lastStatus": [
+              "STOPPED",
+            ],
+            "launchType": [
+              "FARGATE",
+            ],
+          },
+          "detail-type": [
+            "ECS Task State Change",
+          ],
+          "source": [
+            "aws.ecs",
+          ],
+        },
+        "State": "ENABLED",
+      },
+      "Type": "AWS::Events::Rule",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for extended startup failure prefixes 1`] = `
+{
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "Rule4C995B7F": {
+      "Properties": {
+        "EventPattern": {
+          "detail": {
+            "$or": [
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "anything-but": [
+                      "UserInitiated",
+                      "SpotInterruption",
+                    ],
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "stopCode": [
+                  "TaskFailedToStart",
+                ],
+              },
+              {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "prefix": "CannotPullContainerError",
+                  },
+                  {
+                    "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
+                  },
+                  {
+                    "prefix": "Custom startup failure",
                   },
                 ],
               },
@@ -825,12 +1030,23 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                 ],
               },
               {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "prefix": "CannotPullContainerError",
                   },
                   {
                     "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
                   },
                 ],
               },
@@ -942,6 +1158,11 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                 ],
               },
               {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "prefix": "CannotPullContainerError",
@@ -949,6 +1170,138 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                   {
                     "prefix": "ResourceInitializationError",
                   },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
+                  },
+                ],
+              },
+            ],
+            "clusterArn": [
+              "arn:aws:ecs:us-east-1:123456789012:cluster/example-app-cluster",
+            ],
+            "lastStatus": [
+              "STOPPED",
+            ],
+            "launchType": [
+              "FARGATE",
+            ],
+          },
+          "detail-type": [
+            "ECS Task State Change",
+          ],
+          "source": [
+            "aws.ecs",
+          ],
+        },
+        "State": "ENABLED",
+      },
+      "Type": "AWS::Events::Rule",
+    },
+  },
+  "Rules": {
+    "CheckBootstrapVersion": {
+      "Assertions": [
+        {
+          "Assert": {
+            "Fn::Not": [
+              {
+                "Fn::Contains": [
+                  [
+                    "1",
+                    "2",
+                    "3",
+                    "4",
+                    "5",
+                  ],
+                  {
+                    "Ref": "BootstrapVersion",
+                  },
+                ],
+              },
+            ],
+          },
+          "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI.",
+        },
+      ],
+    },
+  },
+}
+`;
+
+exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the snapshot for no startup failure prefixes 1`] = `
+{
+  "Parameters": {
+    "BootstrapVersion": {
+      "Default": "/cdk-bootstrap/hnb659fds/version",
+      "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]",
+      "Type": "AWS::SSM::Parameter::Value<String>",
+    },
+  },
+  "Resources": {
+    "Rule4C995B7F": {
+      "Properties": {
+        "EventPattern": {
+          "detail": {
+            "$or": [
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "anything-but": [
+                      "UserInitiated",
+                      "SpotInterruption",
+                    ],
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "containers": {
+                  "exitCode": [
+                    {
+                      "anything-but": 0,
+                    },
+                  ],
+                },
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
+                "stoppedReason": [
+                  {
+                    "anything-but": {
+                      "prefix": [
+                        "Scaling activity initiated by",
+                        "Task stopped by user",
+                        "Your Spot Task was interrupted",
+                      ],
+                    },
+                  },
+                ],
+              },
+              {
+                "stopCode": [
+                  "TaskFailedToStart",
                 ],
               },
             ],
@@ -1077,12 +1430,23 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                 ],
               },
               {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "prefix": "CannotPullContainerError",
                   },
                   {
                     "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
                   },
                 ],
               },
@@ -1213,12 +1577,23 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                 ],
               },
               {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "prefix": "CannotPullContainerError",
                   },
                   {
                     "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
                   },
                 ],
               },
@@ -1352,12 +1727,23 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                 ],
               },
               {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "prefix": "CannotPullContainerError",
                   },
                   {
                     "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
                   },
                 ],
               },
@@ -1494,12 +1880,23 @@ exports[`EcsFargateTaskTerminationDetectionEventRule snapshots should match the 
                 ],
               },
               {
+                "stopCode": [
+                  {
+                    "exists": false,
+                  },
+                ],
                 "stoppedReason": [
                   {
                     "prefix": "CannotPullContainerError",
                   },
                   {
                     "prefix": "ResourceInitializationError",
+                  },
+                  {
+                    "prefix": "CannotStartContainerError",
+                  },
+                  {
+                    "prefix": "Task failed to start",
                   },
                 ],
               },

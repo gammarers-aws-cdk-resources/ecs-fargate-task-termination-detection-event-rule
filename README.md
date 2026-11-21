@@ -17,6 +17,7 @@ An AWS CDK construct that creates an Amazon EventBridge rule for unexpected ECS 
 - Excludes user stops and Spot interruptions by `stopCode`, and scale-in by a `stoppedReason` prefix
 - Uses those `stoppedReason` prefixes when an event has no `stopCode`
 - Replaces or extends either exclusion list
+- Replaces or extends the startup-failure `stoppedReason` prefixes used when `stopCode` is absent
 - Limits matching to one ECS cluster and to `launchType` `FARGATE`
 - Optionally limits that cluster to one service, raw task group, or task definition
 - Defines its own `eventPattern` (`props.eventPattern` is not allowed)
@@ -25,7 +26,7 @@ An AWS CDK construct that creates an Amazon EventBridge rule for unexpected ECS 
 
 Create `EcsFargateTaskTerminationDetectionEventRule` with the cluster ARN and add an EventBridge target, such as an SNS topic. The rule then receives `ECS Task State Change` events for that cluster when `launchType` is `FARGATE` and `lastStatus` is `STOPPED`. The default `detectionMode` is `ALL_FAILURES`.
 
-EC2 and EXTERNAL tasks in the same cluster do not match. Fargate Spot tasks still match, because their `launchType` remains `FARGATE` (`capacityProviderName` is `FARGATE_SPOT`). On the non-zero exit branch, `stopCode` `UserInitiated` and `SpotInterruption` are excluded. Scale-in and rolling replacement stay excluded by the `stoppedReason` prefix `Scaling activity initiated by`, including when `stopCode` is `ServiceSchedulerInitiated`. An event with no `stopCode` uses the `stoppedReason` prefixes alone.
+EC2 and EXTERNAL tasks in the same cluster do not match. Fargate Spot tasks still match, because their `launchType` remains `FARGATE` (`capacityProviderName` is `FARGATE_SPOT`). On the non-zero exit branch, `stopCode` `UserInitiated` and `SpotInterruption` are excluded. Scale-in and rolling replacement stay excluded by the `stoppedReason` prefix `Scaling activity initiated by`, including when `stopCode` is `ServiceSchedulerInitiated`. An event with no `stopCode` uses the `stoppedReason` prefixes alone. A startup failure matches `stopCode` `TaskFailedToStart`. The startup `stoppedReason` prefixes match only when `stopCode` is absent.
 
 ### Matched
 
@@ -34,7 +35,7 @@ EC2 and EXTERNAL tasks in the same cluster do not match. Fargate Spot tasks stil
 | Non-zero `containers.exitCode`, `stopCode` is not excluded, and `stoppedReason` does not start with an excluded prefix | Application crash, OOM, unhandled SIGKILL, health-check replacement |
 | Non-zero `containers.exitCode`, no `stopCode`, and `stoppedReason` does not start with an excluded prefix | The same failures when the event omits `stopCode` |
 | `stopCode` = `TaskFailedToStart` | Task never reached a running container |
-| `stoppedReason` starts with `CannotPullContainerError` or `ResourceInitializationError` | Image pull, ENI, or secrets init failure when `exitCode` is absent |
+| No `stopCode`, and `stoppedReason` starts with `CannotPullContainerError`, `ResourceInitializationError`, `CannotStartContainerError`, or `Task failed to start` | Image pull, ENI, secrets, or container start failure |
 
 `NON_ZERO_EXIT_CODE` keeps the exit-code rows. `TASK_FAILED_TO_START` keeps the startup and pull rows.
 
@@ -62,7 +63,7 @@ These operational stops are ignored on the non-zero `exitCode` branch. Startup-f
 ### Missed
 
 - Startup and pull failures in `NON_ZERO_EXIT_CODE` mode. `CannotPullContainerError`, `ResourceInitializationError`, and `TaskFailedToStart` usually have no `containers.exitCode`, so they are dropped unless you use `ALL_FAILURES` (default) or `TASK_FAILED_TO_START`.
-- Other startup errors without `TaskFailedToStart`. `stoppedReason` values that do not start with the two known prefixes (for example some `CannotStartContainerError` or timeout messages) are not matched.
+- Startup errors that have neither `stopCode` `TaskFailedToStart` nor one of the default `stoppedReason` prefixes. A startup-like `stoppedReason` paired with a different `stopCode` is not treated as a startup failure.
 - Exit code `0`. A successful container exit is never treated as a failure.
 - Other clusters, non-Fargate launch types, or `lastStatus` other than `STOPPED`.
 - Other services, groups, or task definitions when `serviceName`, `group`, or `taskDefinitionArn` is set. `taskDefinitionArn` is an exact match, including the revision when the event has one.
@@ -141,6 +142,7 @@ You can also pass `targets` in the constructor (`RuleProps`) instead of calling 
 import {
   DefaultExcludedStopCodes,
   DefaultExcludedStoppedReasonPrefixes,
+  DefaultStartupFailureStoppedReasonPrefixes,
   EcsFargateTaskTerminationDetectionEventRule,
   EcsFargateTaskTerminationDetectionMode,
   EcsTaskStopCode,
@@ -179,6 +181,15 @@ const replacedExclusionsRule = new EcsFargateTaskTerminationDetectionEventRule(s
   ],
 });
 
+// Extend the startup-failure prefixes used when stopCode is absent
+const extendedStartupRule = new EcsFargateTaskTerminationDetectionEventRule(stack, 'ExtendedStartupRule', {
+  clusterArn,
+  startupFailureStoppedReasonPrefixes: [
+    ...DefaultStartupFailureStoppedReasonPrefixes.ALL,
+    'Custom startup failure',
+  ],
+});
+
 // Extend the default excluded stoppedReason prefixes
 const extendedExclusionsRule = new EcsFargateTaskTerminationDetectionEventRule(stack, 'ExtendedExclusionsRule', {
   clusterArn,
@@ -197,9 +208,10 @@ const extendedExclusionsRule = new EcsFargateTaskTerminationDetectionEventRule(s
 | `serviceName` | No | | ECS service name. Matched as `detail.group` = `service:${serviceName}`. Do not include the `service:` prefix. Must not be empty. Cannot be set together with `group`. |
 | `group` | No | | Raw ECS task group, matched exactly against `detail.group`. Use this for a non-service group. Must not be empty. Cannot be set together with `serviceName`. |
 | `taskDefinitionArn` | No | | Task definition ARN, matched exactly against `detail.taskDefinitionArn`, including the revision when the event has one. Must not be empty. |
-| `detectionMode` | No | `EcsFargateTaskTerminationDetectionMode.ALL_FAILURES` | `ALL_FAILURES` matches a non-zero `exitCode` or a startup or pull failure. `NON_ZERO_EXIT_CODE` matches only non-zero container exit codes. `TASK_FAILED_TO_START` matches only startup or pull failures. |
+| `detectionMode` | No | `EcsFargateTaskTerminationDetectionMode.ALL_FAILURES` | `ALL_FAILURES` matches a non-zero `exitCode` or a startup failure. `NON_ZERO_EXIT_CODE` matches only non-zero container exit codes. `TASK_FAILED_TO_START` matches `stopCode` `TaskFailedToStart`, and the startup `stoppedReason` prefixes when `stopCode` is absent. |
 | `excludedStopCodes` | No | `DefaultExcludedStopCodes.ALL` | `stopCode` values excluded from non-zero exit-code matching when the event has a `stopCode`. The default is `UserInitiated` and `SpotInterruption`. Pass a new array to replace the default set, spread `DefaultExcludedStopCodes.ALL` and append `EcsTaskStopCode` values to extend it, or pass `[]` to disable this filter. Must not contain empty strings. |
 | `excludedStoppedReasonPrefixes` | No | `DefaultExcludedStoppedReasonPrefixes.ALL` | `stoppedReason` prefixes excluded from non-zero exit-code matching. Applied together with `excludedStopCodes` when `stopCode` is present, and alone when `stopCode` is absent. Pass a new array to replace the default set, spread `DefaultExcludedStoppedReasonPrefixes.ALL` to extend it, or pass `[]` to disable prefix exclusion. Must not contain empty strings. |
+| `startupFailureStoppedReasonPrefixes` | No | `DefaultStartupFailureStoppedReasonPrefixes.ALL` | `stoppedReason` prefixes that match a startup failure when `stopCode` is absent. The default includes `CannotPullContainerError`, `ResourceInitializationError`, `CannotStartContainerError`, and `Task failed to start`. `stopCode` `TaskFailedToStart` matches even when this list is empty. Spread `DefaultStartupFailureStoppedReasonPrefixes.ALL` to extend it. Must not contain empty strings. |
 | Other `RuleProps` | No | | For example `description`, `enabled`, `ruleName`, and `targets`. |
 | `eventPattern` | | | Not supported. The construct always defines its own `eventPattern` and throws if one is provided. |
 

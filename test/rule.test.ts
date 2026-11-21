@@ -3,6 +3,7 @@ import * as events from 'aws-cdk-lib/aws-events';
 import {
   DefaultExcludedStopCodes,
   DefaultExcludedStoppedReasonPrefixes,
+  DefaultStartupFailureStoppedReasonPrefixes,
   EcsFargateTaskTerminationDetectionEventRule,
   EcsFargateTaskTerminationDetectionMode,
   EcsTaskStopCode,
@@ -77,15 +78,34 @@ const DEFAULT_NON_ZERO_EXIT_CODE_CONDITION = {
   $or: exitBranches(DEFAULT_EXCLUDED_PREFIXES),
 };
 
-const STARTUP_FAILURE_CONDITIONS = [
-  { stopCode: ['TaskFailedToStart'] },
-  {
-    stoppedReason: [
-      { prefix: 'CannotPullContainerError' },
-      { prefix: 'ResourceInitializationError' },
-    ],
-  },
+const DEFAULT_STARTUP_PREFIXES = [
+  DefaultStartupFailureStoppedReasonPrefixes.CANNOT_PULL_CONTAINER_ERROR,
+  DefaultStartupFailureStoppedReasonPrefixes.RESOURCE_INITIALIZATION_ERROR,
+  DefaultStartupFailureStoppedReasonPrefixes.CANNOT_START_CONTAINER_ERROR,
+  DefaultStartupFailureStoppedReasonPrefixes.TASK_FAILED_TO_START,
 ];
+
+/**
+ * Builds the startup-failure branches for the given prefixes.
+ *
+ * @param prefixes - Prefixes matched when `stopCode` is absent.
+ * @returns One branch when `prefixes` is empty, otherwise the stop-code and prefix branches.
+ */
+const startupBranches = (prefixes: string[] = DEFAULT_STARTUP_PREFIXES): Record<string, unknown>[] => {
+  const withStopCode = { stopCode: [EcsTaskStopCode.TASK_FAILED_TO_START] };
+  if (prefixes.length === 0) {
+    return [withStopCode];
+  }
+  return [
+    withStopCode,
+    {
+      stopCode: [{ exists: false }],
+      stoppedReason: prefixes.map((prefix) => ({ prefix })),
+    },
+  ];
+};
+
+const STARTUP_FAILURE_CONDITIONS = startupBranches();
 
 const ALL_FAILURES_DETAIL = {
   $or: [...exitBranches(DEFAULT_EXCLUDED_PREFIXES), ...STARTUP_FAILURE_CONDITIONS],
@@ -141,6 +161,7 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
       EcsTaskStopCode.USER_INITIATED,
       EcsTaskStopCode.SPOT_INTERRUPTION,
     ]);
+    expect(DefaultStartupFailureStoppedReasonPrefixes.ALL).toEqual(DEFAULT_STARTUP_PREFIXES);
   });
 
   describe('detectionMode', () => {
@@ -338,6 +359,48 @@ describe('EcsFargateTaskTerminationDetectionEventRule', () => {
       expect(() => {
         createTemplate({ excludedStopCodes: [EcsTaskStopCode.USER_INITIATED, ''] });
       }).toThrow('excludedStopCodes must not contain empty strings.');
+    });
+  });
+
+  describe('startupFailureStoppedReasonPrefixes', () => {
+    it.each([
+      {
+        name: 'replace the default prefixes',
+        props: {
+          detectionMode: EcsFargateTaskTerminationDetectionMode.TASK_FAILED_TO_START,
+          startupFailureStoppedReasonPrefixes: ['CannotStartContainerError'],
+        },
+        detail: { $or: startupBranches(['CannotStartContainerError']) },
+      },
+      {
+        name: 'extend the default prefixes',
+        props: {
+          detectionMode: EcsFargateTaskTerminationDetectionMode.TASK_FAILED_TO_START,
+          startupFailureStoppedReasonPrefixes: [
+            ...DefaultStartupFailureStoppedReasonPrefixes.ALL,
+            'Custom startup failure',
+          ],
+        },
+        detail: {
+          $or: startupBranches([...DEFAULT_STARTUP_PREFIXES, 'Custom startup failure']),
+        },
+      },
+      {
+        name: 'match only TaskFailedToStart when the array is empty',
+        props: {
+          detectionMode: EcsFargateTaskTerminationDetectionMode.TASK_FAILED_TO_START,
+          startupFailureStoppedReasonPrefixes: [],
+        },
+        detail: startupBranches([])[0],
+      },
+    ])('should $name', ({ props, detail }) => {
+      expectEventPattern(createTemplate(props), detail);
+    });
+
+    it('should throw when it contains an empty string', () => {
+      expect(() => {
+        createTemplate({ startupFailureStoppedReasonPrefixes: ['CannotPullContainerError', ''] });
+      }).toThrow('startupFailureStoppedReasonPrefixes must not contain empty strings.');
     });
   });
 

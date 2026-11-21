@@ -2,6 +2,7 @@ import { SERVICE_NAME, TASK_DEFINITION_ARN, TASK_GROUP } from './constants';
 import {
   DefaultExcludedStopCodes,
   DefaultExcludedStoppedReasonPrefixes,
+  DefaultStartupFailureStoppedReasonPrefixes,
   EcsFargateTaskTerminationDetectionEventRuleProps,
   EcsFargateTaskTerminationDetectionMode,
   EcsTaskStopCode,
@@ -62,4 +63,11 @@ export const RULE_PROPS_CASES: RulePropsCase[] = [
       excludedStopCodes: [...DefaultExcludedStopCodes.ALL, EcsTaskStopCode.TERMINATION_NOTICE],
     },
   },
+  {
+    name: 'extended startup failure prefixes',
+    props: {
+      startupFailureStoppedReasonPrefixes: [...DefaultStartupFailureStoppedReasonPrefixes.ALL, 'Custom startup failure'],
+    },
+  },
+  { name: 'no startup failure prefixes', props: { startupFailureStoppedReasonPrefixes: [] } },
 ];

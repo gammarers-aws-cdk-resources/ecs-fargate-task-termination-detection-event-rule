@@ -7,8 +7,9 @@
 EventBridge rule that detects ECS/Fargate task terminations caused by unexpected failures, while excluding expected operational stops (scale-in, rolling deployment replacement, user-initiated stops, and Fargate Spot interruptions).
 
 By default this matches both non-zero container exit codes and startup/pull
-failures where `exitCode` is absent (for example `CannotPullContainerError`
-/ `TaskFailedToStart`). Use {@link EcsFargateTaskTerminationDetectionMode}
+failures where `exitCode` is absent. Startup failures match `stopCode`
+`TaskFailedToStart`, and {@link DefaultStartupFailureStoppedReasonPrefixes.ALL}
+when `stopCode` is absent. Use {@link EcsFargateTaskTerminationDetectionMode}
 to narrow the match if needed.
 
 User-initiated stops and Fargate Spot interruptions are excluded by
@@ -431,6 +432,7 @@ const ecsFargateTaskTerminationDetectionEventRuleProps: EcsFargateTaskTerminatio
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.excludedStoppedReasonPrefixes">excludedStoppedReasonPrefixes</a></code> | <code>string[]</code> | `stoppedReason` prefixes excluded from non-zero exit-code matching via EventBridge `anything-but` prefix matching. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.group">group</a></code> | <code>string</code> | Raw ECS task group used to narrow matching. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.serviceName">serviceName</a></code> | <code>string</code> | ECS service name used to narrow matching to one service. |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.startupFailureStoppedReasonPrefixes">startupFailureStoppedReasonPrefixes</a></code> | <code>string[]</code> | `stoppedReason` prefixes that match a startup failure when the event has no `stopCode`. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.taskDefinitionArn">taskDefinitionArn</a></code> | <code>string</code> | Task definition ARN used to narrow matching. |
 
 ---
@@ -685,6 +687,28 @@ Cannot be set together with {@link EcsFargateTaskTerminationDetectionEventRulePr
 
 ---
 
+##### `startupFailureStoppedReasonPrefixes`<sup>Optional</sup> <a name="startupFailureStoppedReasonPrefixes" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.startupFailureStoppedReasonPrefixes"></a>
+
+```typescript
+public readonly startupFailureStoppedReasonPrefixes: string[];
+```
+
+- *Type:* string[]
+- *Default:* DefaultStartupFailureStoppedReasonPrefixes.ALL
+
+`stoppedReason` prefixes that match a startup failure when the event has no `stopCode`.
+
+`stopCode` `TaskFailedToStart` always matches in
+{@link EcsFargateTaskTerminationDetectionMode.TASK_FAILED_TO_START} and
+{@link EcsFargateTaskTerminationDetectionMode.ALL_FAILURES}, and does not
+use this list.
+
+Pass a new array to replace the default set. To extend defaults, spread
+{@link DefaultStartupFailureStoppedReasonPrefixes.ALL}. Pass an empty array
+to match startup failures only by `stopCode` `TaskFailedToStart`.
+
+---
+
 ##### `taskDefinitionArn`<sup>Optional</sup> <a name="taskDefinitionArn" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRuleProps.property.taskDefinitionArn"></a>
 
 ```typescript
@@ -872,6 +896,108 @@ Console/API stop (`stopCode` = `UserInitiated`).
 
 ---
 
+### DefaultStartupFailureStoppedReasonPrefixes <a name="DefaultStartupFailureStoppedReasonPrefixes" id="ecs-fargate-task-termination-detection-event-rule.DefaultStartupFailureStoppedReasonPrefixes"></a>
+
+Default `stoppedReason` prefixes that match a startup failure when `stopCode` is absent.
+
+`stopCode` `TaskFailedToStart` is matched separately and does not use this list.
+
+Override via {@link EcsFargateTaskTerminationDetectionEventRuleProps.startupFailureStoppedReasonPrefixes}.
+To extend this set, spread {@link DefaultStartupFailureStoppedReasonPrefixes.ALL}.
+
+#### Initializers <a name="Initializers" id="ecs-fargate-task-termination-detection-event-rule.DefaultStartupFailureStoppedReasonPrefixes.Initializer"></a>
+
+```typescript
+import { DefaultStartupFailureStoppedReasonPrefixes } from 'ecs-fargate-task-termination-detection-event-rule'
+
+new DefaultStartupFailureStoppedReasonPrefixes()
+```
+
+| **Name** | **Type** | **Description** |
+| --- | --- | --- |
+
+---
+
+
+
+
+#### Constants <a name="Constants" id="Constants"></a>
+
+| **Name** | **Type** | **Description** |
+| --- | --- | --- |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.DefaultStartupFailureStoppedReasonPrefixes.property.ALL">ALL</a></code> | <code>string[]</code> | All default startup-failure prefixes, in a stable order. |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.DefaultStartupFailureStoppedReasonPrefixes.property.CANNOT_PULL_CONTAINER_ERROR">CANNOT_PULL_CONTAINER_ERROR</a></code> | <code>string</code> | Image pull failure. |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.DefaultStartupFailureStoppedReasonPrefixes.property.CANNOT_START_CONTAINER_ERROR">CANNOT_START_CONTAINER_ERROR</a></code> | <code>string</code> | Container runtime failed to start the container. |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.DefaultStartupFailureStoppedReasonPrefixes.property.RESOURCE_INITIALIZATION_ERROR">RESOURCE_INITIALIZATION_ERROR</a></code> | <code>string</code> | ENI or secrets initialization failure. |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.DefaultStartupFailureStoppedReasonPrefixes.property.TASK_FAILED_TO_START">TASK_FAILED_TO_START</a></code> | <code>string</code> | Generic "task failed to start" wording used when `stopCode` was not set. |
+
+---
+
+##### `ALL`<sup>Required</sup> <a name="ALL" id="ecs-fargate-task-termination-detection-event-rule.DefaultStartupFailureStoppedReasonPrefixes.property.ALL"></a>
+
+```typescript
+public readonly ALL: string[];
+```
+
+- *Type:* string[]
+
+All default startup-failure prefixes, in a stable order.
+
+Contains {@link DefaultStartupFailureStoppedReasonPrefixes.CANNOT_PULL_CONTAINER_ERROR},
+{@link DefaultStartupFailureStoppedReasonPrefixes.RESOURCE_INITIALIZATION_ERROR},
+{@link DefaultStartupFailureStoppedReasonPrefixes.CANNOT_START_CONTAINER_ERROR}, and
+{@link DefaultStartupFailureStoppedReasonPrefixes.TASK_FAILED_TO_START}.
+
+---
+
+##### `CANNOT_PULL_CONTAINER_ERROR`<sup>Required</sup> <a name="CANNOT_PULL_CONTAINER_ERROR" id="ecs-fargate-task-termination-detection-event-rule.DefaultStartupFailureStoppedReasonPrefixes.property.CANNOT_PULL_CONTAINER_ERROR"></a>
+
+```typescript
+public readonly CANNOT_PULL_CONTAINER_ERROR: string;
+```
+
+- *Type:* string
+
+Image pull failure.
+
+---
+
+##### `CANNOT_START_CONTAINER_ERROR`<sup>Required</sup> <a name="CANNOT_START_CONTAINER_ERROR" id="ecs-fargate-task-termination-detection-event-rule.DefaultStartupFailureStoppedReasonPrefixes.property.CANNOT_START_CONTAINER_ERROR"></a>
+
+```typescript
+public readonly CANNOT_START_CONTAINER_ERROR: string;
+```
+
+- *Type:* string
+
+Container runtime failed to start the container.
+
+---
+
+##### `RESOURCE_INITIALIZATION_ERROR`<sup>Required</sup> <a name="RESOURCE_INITIALIZATION_ERROR" id="ecs-fargate-task-termination-detection-event-rule.DefaultStartupFailureStoppedReasonPrefixes.property.RESOURCE_INITIALIZATION_ERROR"></a>
+
+```typescript
+public readonly RESOURCE_INITIALIZATION_ERROR: string;
+```
+
+- *Type:* string
+
+ENI or secrets initialization failure.
+
+---
+
+##### `TASK_FAILED_TO_START`<sup>Required</sup> <a name="TASK_FAILED_TO_START" id="ecs-fargate-task-termination-detection-event-rule.DefaultStartupFailureStoppedReasonPrefixes.property.TASK_FAILED_TO_START"></a>
+
+```typescript
+public readonly TASK_FAILED_TO_START: string;
+```
+
+- *Type:* string
+
+Generic "task failed to start" wording used when `stopCode` was not set.
+
+---
+
 
 ## Enums <a name="Enums" id="Enums"></a>
 
@@ -884,7 +1010,7 @@ How {@link EcsFargateTaskTerminationDetectionEventRule} matches ECS/Fargate task
 | **Name** | **Description** |
 | --- | --- |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode.NON_ZERO_EXIT_CODE">NON_ZERO_EXIT_CODE</a></code> | Detect only container exits with a non-zero `exitCode`. |
-| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode.TASK_FAILED_TO_START">TASK_FAILED_TO_START</a></code> | Detect only tasks that failed to start (for example image pull failures). |
+| <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode.TASK_FAILED_TO_START">TASK_FAILED_TO_START</a></code> | Detect only tasks that failed to start. |
 | <code><a href="#ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode.ALL_FAILURES">ALL_FAILURES</a></code> | Detect both non-zero exit codes and startup/pull failures (`TaskFailedToStart` / known `stoppedReason` prefixes). |
 
 ---
@@ -901,11 +1027,10 @@ where `containers.exitCode` is absent.
 
 ##### `TASK_FAILED_TO_START` <a name="TASK_FAILED_TO_START" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionMode.TASK_FAILED_TO_START"></a>
 
-Detect only tasks that failed to start (for example image pull failures).
+Detect only tasks that failed to start.
 
-Matched via `stopCode` = `TaskFailedToStart` or known startup-failure
-`stoppedReason` prefixes (`CannotPullContainerError`,
-`ResourceInitializationError`).
+Matched via `stopCode` `TaskFailedToStart`. When `stopCode` is absent,
+known startup-failure `stoppedReason` prefixes match instead.
 
 ---
 
