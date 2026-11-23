@@ -4,6 +4,8 @@
 
 ### EcsFargateTaskTerminationDetectionEventRule <a name="EcsFargateTaskTerminationDetectionEventRule" id="ecs-fargate-task-termination-detection-event-rule.EcsFargateTaskTerminationDetectionEventRule"></a>
 
+- *Implements:* constructs.IConstruct, constructs.IDependable, aws-cdk-lib.IResource, aws-cdk-lib.interfaces.IEnvironmentAware, aws-cdk-lib.aws_events.IRule
+
 EventBridge rule that detects ECS/Fargate task terminations caused by unexpected failures, while excluding expected operational stops (scale-in, rolling deployment replacement, user-initiated stops, and Fargate Spot interruptions).
 
 By default this matches both non-zero container exit codes and startup/pull
